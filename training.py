@@ -1,5 +1,6 @@
 from preprocessing import *
 from transformers import *
+from collections import defaultdict
 
 def get_batch(tup, old, new):
 	return [x[old:new] for x in tup]
