@@ -19,6 +19,42 @@ def write_html_file(sent, q1, q2):
 	html_string += "</p>\n"
 	return html_string	
 
+def macro_f1(y_true, y_pred):
+	"""
+	evaluate macro f1 (prodcues the same results as the official scoring file "semeval2010_task8_scorer-v1.2.pl"
+	ignores the Other class
+	returns pr, rc and f1 rounded to two decimal points as strings
+	"""
+
+	OTHER = "Other"
+	d = defaultdict(int)
+	for i,j in zip(y_true, y_pred):
+		if i == j:
+			d[i.split("(")[0] +"_TP"] += 1
+		else:
+			d[j.split("(")[0] + "_FP"] += 1
+			d[i.split("(")[0] + "_FN"] += 1
+	TP = 0
+	FP = 0
+	FN = 0
+	items = set()
+	for key in d:
+		items.add(key.split("_")[0])
+	items.remove(OTHER)
+	pr, rc, f = 0,0,0
+	for item in items:
+		t_pr = d[item + "_TP"] / (d[item + "_TP"] + d[item + "_FP"])
+		t_rc = d[item + "_TP"] / (d[item + "_TP"] + d[item + "_FN"])
+		pr += t_pr
+		rc += t_rc
+		if t_pr + t_rc == 0:
+			print (len(items))
+			continue
+		f += 2 * t_pr * t_rc / (t_pr + t_rc)
+	Pr = pr /len(items)
+	Rc = rc / len(items)
+	F1 = f / len(items)
+	return "{0:.2f}".format(Pr * 100), "{0:.2f}".format(Rc * 100), "{0:.2f}".format(F1 * 100)
 
 
 if __name__ == "__main__":
