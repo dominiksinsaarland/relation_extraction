@@ -15,7 +15,7 @@ class model:
 		self.preprocessing = preprocessing
 		self.FLAGS = FLAGS
 		self.create_position_lookup()
-
+		# word ids
 		self.x = tf.placeholder(tf.int32, shape=[None, None])
 		# labels
 		self.y = tf.placeholder(tf.int32, shape=[None, None])
@@ -26,7 +26,6 @@ class model:
 		# position of queries
 		self.query_positions = tf.placeholder(tf.int32, shape=[None, 2])
 
-
 		# convert embedding matrices to tf.tensors
 		self.embeddings = tf.get_variable("embedding", np.shape(self.preprocessing.embs), initializer=tf.constant_initializer(self.preprocessing.embs),dtype=tf.float32, trainable=False)
 		self.position_lookup = tf.get_variable("positions", np.shape(self.position_enc), initializer=tf.constant_initializer(self.position_enc), dtype=tf.float32, trainable=False)
@@ -35,8 +34,9 @@ class model:
 		self.inputs = tf.nn.embedding_lookup(self.embeddings, self.x)
 		self.mask = tf.to_float(tf.where(tf.equal(self.inputs, tf.zeros_like(self.inputs)), x=tf.zeros_like(self.inputs),y=tf.ones_like(self.inputs)))
 
-		self.inputs = self.normalize(self.inputs)
-		self.inputs = tf.layers.dropout(self.inputs, rate=0.1, training=True)
+		# normalize inputs?
+		#self.inputs = self.normalize(self.inputs)
+		#self.inputs = tf.layers.dropout(self.inputs, rate=0.1, training=True)
 
 		self.position_inputs = tf.nn.embedding_lookup(self.position_lookup, self.positions)
 		self.inputs = tf.add(self.inputs, self.position_inputs)
@@ -46,16 +46,23 @@ class model:
 		
 		# prepare decoder
 		self.decoder_inputs = tf.nn.embedding_lookup(self.embeddings, self.queries)
-		self.decoder_inputs = self.normalize(self.decoder_inputs)
-		self.decoder_inputs = tf.layers.dropout(self.decoder_inputs, rate=0.1, training=True)
+
+		# normalize inputs?
+		#self.decoder_inputs = self.normalize(self.decoder_inputs)
+		#self.decoder_inputs = tf.layers.dropout(self.decoder_inputs, rate=0.1, training=True)
+
 		self.decoder_inputs = tf.add(self.decoder_inputs, tf.nn.embedding_lookup(self.position_lookup, self.query_positions))
 
+		# encode sentence
 		self.encoded = self.encode_sentence(self.inputs, FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
-
+		
+		# decode with queries
 		self.logits = self.decode_sentence(self.decoder_inputs, self.encoded,  FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
 
+		# cross entropy or mean squared?
 		#self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.y))
 
+		# add l2 losses?
 		#self.l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.FLAGS.l2_lambda
 		#self.cost += self.l2_losses
 
@@ -65,6 +72,7 @@ class model:
 		self.learning_rate = tf.placeholder(tf.float32, shape=[])
 
 		"""
+		# or even gradient clipping?
 		params = tf.trainable_variables()
 		gradients = tf.gradients(self.cost, params)
 
@@ -77,11 +85,8 @@ class model:
 		self.train_step = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.9, beta2=0.98,epsilon=1e-09).minimize(self.cost)
 
 
-		#self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.9, beta2=0.98,epsilon=1e-09)
-		#self.train_step = self.optimizer.minimize(self.cost)
-		#optimizer= tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
-
 		# predictions
+		# inference without dropouts applied
 		self.inference_encoded_sentence = self.encode_sentence(self.inputs, FLAGS.num_layers, FLAGS.num_heads, is_training=False)
 		self.preds = self.decode_sentence(self.decoder_inputs, self.inference_encoded_sentence, FLAGS.num_layers, FLAGS.num_heads, is_training=False)
 		
@@ -125,49 +130,24 @@ class model:
 
 		return out
 
-	def add_and_norm(self, old_inputs, inputs, paddings):
+	def add_and_norm(self, old_inputs, inputs):
 		"""
 		We employ a residual connection [11] around each of
 		the two sub-layers, followed by layer normalization [1]. That is, the output of each sub-layer is
 		LayerNorm(x + Sublayer(x)), where Sublayer(x) is the function implemented by the sub-layer
 		itself
 		"""
-		inputs = tf.add(old_inputs, inputs)
-		"""
-		if paddings:
-			x = tf.multiply(inputs,self.mask)
-			non_paddings = tf.reduce_sum(self.mask)
-			all_elems = tf.reduce_sum(tf.ones_like(self.mask))
-			mean = tf.reduce_sum(x, keep_dims=True) * all_elems / non_paddings
-			mean_mask = tf.ones_like(x) * mean
-			
-			variance_mask = tf.where(tf.equal(x, self.mask), x=mean_mask, y=x)
-			variance = tf.reduce_sum(tf.square(variance_mask - mean), axis=[-1], keep_dims=True) / non_paddings
-			norm_x = (x - mean) * tf.rsqrt(variance + 1e-9)
-		else:
-			x = inputs
-			mean = tf.reduce_mean(x, axis=[-1], keep_dims=True)
-			variance = tf.reduce_mean(tf.square(x - mean), axis=[-1], keep_dims=True)
-			norm_x = (x - mean) * tf.rsqrt(variance + 1e-9)
-
-		return norm_x
-		"""
-		return self.normalize(inputs)
-
+		x = tf.add(old_inputs, inputs)
+		x = self.normalize(x)
+		return x
 
 	def normalize(self, inputs, epsilon = 1e-6, scope="layer_norm", reuse=None):
-		with tf.variable_scope(scope, reuse=reuse):
-			inputs_shape = inputs.get_shape()
-			params_shape = inputs_shape[-1:]
+		inputs_shape = inputs.get_shape()
+		params_shape = inputs_shape[-1:]
 	
-			mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
-			print ("scope", scope)
-			print ("layer norm shapes", mean.get_shape(), variance.get_shape())
-			#beta= tf.Variable(tf.zeros(params_shape))
-			#gamma = tf.Variable(tf.ones(params_shape))
-			normalized = (inputs - mean) / ( (variance + epsilon) ** (.5) )
-			outputs = normalized		
-		return outputs
+		mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
+		normalized = (inputs - mean) / ( (variance + epsilon) ** (.5) )
+		return normalized
 
 	def multihead_attention(self,queries, keys, scope="multihead_attention",is_training=True):
 		num_units = self.FLAGS.embeddings_dim
@@ -208,16 +188,20 @@ class model:
 				x = x / (K.get_shape().as_list()[-1] ** 0.5)
 
 				#mask_softmax = tf.where(tf.greater(outputs, tf.zeros_like(outputs)), x=outputs, y=tf.ones_like(outputs) * -100000)
+				# mask padding tokens
 				mask_softmax = tf.where(tf.equal(x, tf.zeros_like(x)), x=tf.ones_like(x) * -10000000, y=x)
 				x = tf.nn.softmax(mask_softmax, name="attention_softmax")
-				# rescale
+
+				# get values
 				x = tf.matmul(x, V)
+
 				# outputs are [batch_size, 2, 100]
 				# concat intermediate results
 				if head == 0:
 					head_i = x
 				else:
 					head_i = tf.concat([head_i, x], axis=-1)
+		# output projection
 		with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
 			x = tf.layers.dense(head_i, num_units, activation=tf.nn.relu, use_bias=False, name="output_projection_matmul")
 		return x
@@ -239,7 +223,7 @@ class model:
 				attention = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
 				print (attention.get_shape())
 
-				postprocess = self.add_and_norm(inputs, attention, True)
+				postprocess = self.add_and_norm(inputs, attention)
 				print (postprocess.get_shape())
 
 				# feedforward step
@@ -247,7 +231,7 @@ class model:
 				feed_forward = self.pointwise_feedforward(postprocess, "feedforward_%d" % layer, is_training=is_training)
 
 				feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
-				inputs = self.add_and_norm(postprocess, feed_forward, True)
+				inputs = self.add_and_norm(postprocess, feed_forward)
 
 				# set padding tokens back to zero
 				inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=inputs, y=tf.zeros_like(self.mask))
@@ -264,12 +248,12 @@ class model:
 				# self attention first
 				self_attention = self.multihead_attention(decoder_input, decoder_input, scope="self_attention_%d" % layer, is_training=is_training)
 				self_attention = tf.layers.dropout(self_attention, rate=dropout_rate, training=is_training)
-				postprocess = self.add_and_norm(decoder_input, self_attention, False)
+				postprocess = self.add_and_norm(decoder_input, self_attention)
 
 				# then multi head attention over encoded input
 				attention = self.multihead_attention(postprocess, encoder_input, scope="multihead_attention_decoder_%d" % layer, is_training=is_training)
 				attention = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
-				postprocess = self.add_and_norm(postprocess, attention, False)			
+				postprocess = self.add_and_norm(postprocess, attention)			
 
 				# followed by feedforward
 				# if not output layer
