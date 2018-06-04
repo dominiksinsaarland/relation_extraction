@@ -35,8 +35,9 @@ class model:
 		self.inputs = tf.nn.embedding_lookup(self.embeddings, self.x)
 		self.mask = tf.to_float(tf.where(tf.equal(self.inputs, tf.zeros_like(self.inputs)), x=tf.zeros_like(self.inputs),y=tf.ones_like(self.inputs)))
 
-		self.inputs = self.normalize(self.inputs)
-		self.inputs = tf.layers.dropout(self.inputs, rate=0.1, training=True)
+		# normalize input?
+		#self.inputs = self.normalize(self.inputs)
+		#self.inputs = tf.layers.dropout(self.inputs, rate=0.1, training=True)
 
 		self.position_inputs = tf.nn.embedding_lookup(self.position_lookup, self.positions)
 		self.inputs = tf.add(self.inputs, self.position_inputs)
@@ -46,25 +47,31 @@ class model:
 		
 		# prepare decoder
 		self.decoder_inputs = tf.nn.embedding_lookup(self.embeddings, self.queries)
-		self.decoder_inputs = self.normalize(self.decoder_inputs)
-		self.decoder_inputs = tf.layers.dropout(self.decoder_inputs, rate=0.1, training=True)
+		
+		# normalize input?
+		#self.decoder_inputs = self.normalize(self.decoder_inputs)
+		#self.decoder_inputs = tf.layers.dropout(self.decoder_inputs, rate=0.1, training=True)
+
 		self.decoder_inputs = tf.add(self.decoder_inputs, tf.nn.embedding_lookup(self.position_lookup, self.query_positions))
 
+		# encode sentence
 		self.encoded = self.encode_sentence(self.inputs, FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
 
+		# query encoded sentence
 		self.logits = self.decode_sentence(self.decoder_inputs, self.encoded,  FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
 
+		# use crossentropy or mean squared error?
 		#self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.y))
 
+		# add l2 losses?
 		#self.l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.FLAGS.l2_lambda
 		#self.cost += self.l2_losses
 
 		self.cost = tf.reduce_mean(tf.losses.mean_squared_error(self.y, tf.nn.softmax(self.logits)))
-
-
 		self.learning_rate = tf.placeholder(tf.float32, shape=[])
 
 		"""
+		# do gradient clipping?
 		params = tf.trainable_variables()
 		gradients = tf.gradients(self.cost, params)
 
@@ -76,17 +83,14 @@ class model:
 		"""
 		self.train_step = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.9, beta2=0.98,epsilon=1e-09).minimize(self.cost)
 
-
-		#self.optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.9, beta2=0.98,epsilon=1e-09)
-		#self.train_step = self.optimizer.minimize(self.cost)
-		#optimizer= tf.train.GradientDescentOptimizer(learning_rate=learning_rate)
-
 		# predictions
 		self.inference_encoded_sentence = self.encode_sentence(self.inputs, FLAGS.num_layers, FLAGS.num_heads, is_training=False)
 		self.preds = self.decode_sentence(self.decoder_inputs, self.inference_encoded_sentence, FLAGS.num_layers, FLAGS.num_heads, is_training=False)
 		
 		self.preds = tf.nn.softmax(self.preds)
 		self.predictions = tf.cast(tf.argmax(self.preds, axis=-1), tf.int32)
+
+		print ([n.name for n in tf.get_default_graph().as_graph_def().node])
 		self.get_attention_scores = tf.get_default_graph().get_tensor_by_name("decoder_layers_0/multihead_attention_decoder_%d/attention_softmax:0" % (FLAGS.num_layers - 1))
 
 
@@ -283,8 +287,8 @@ class model:
 					out = self.add_and_norm(postprocess, feed_forward)
 
 					with tf.variable_scope("classify", reuse=tf.AUTO_REUSE):
-						#concat = tf.reshape(out, [-1, self.FLAGS.embeddings_dim * 2])
-						concat = tf.reduce_sum(out, axis=1)
+						concat = tf.reshape(out, [-1, self.FLAGS.embeddings_dim * 2])
+						#concat = tf.reduce_sum(out, axis=1)
 						#h1 = tf.layers.dense(inputs=concat, units=self.FLAGS.classifier_units, activation=tf.nn.relu)
 						#h1 = tf.layers.dropout(inputs=h1, rate=dropout_rate, training=is_training)
 						logits = tf.layers.dense(concat, units=19, name="out")
