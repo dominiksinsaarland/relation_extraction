@@ -125,7 +125,7 @@ class model:
 
 		return out
 
-	def add_and_norm(self, old_inputs, inputs, paddings):
+	def add_and_norm(self, old_inputs, inputs):
 		"""
 		We employ a residual connection [11] around each of
 		the two sub-layers, followed by layer normalization [1]. That is, the output of each sub-layer is
@@ -247,7 +247,7 @@ class model:
 				feed_forward = self.pointwise_feedforward(postprocess, "feedforward_%d" % layer, is_training=is_training)
 
 				feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
-				inputs = self.add_and_norm(postprocess, feed_forward, True)
+				inputs = self.add_and_norm(postprocess, feed_forward)
 
 				# set padding tokens back to zero
 				inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=inputs, y=tf.zeros_like(self.mask))
@@ -264,23 +264,23 @@ class model:
 				# self attention first
 				self_attention = self.multihead_attention(decoder_input, decoder_input, scope="self_attention_%d" % layer, is_training=is_training)
 				self_attention = tf.layers.dropout(self_attention, rate=dropout_rate, training=is_training)
-				postprocess = self.add_and_norm(decoder_input, self_attention, False)
+				postprocess = self.add_and_norm(decoder_input, self_attention)
 
 				# then multi head attention over encoded input
 				attention = self.multihead_attention(postprocess, encoder_input, scope="multihead_attention_decoder_%d" % layer, is_training=is_training)
 				attention = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
-				postprocess = self.add_and_norm(postprocess, attention, False)			
+				postprocess = self.add_and_norm(postprocess, attention)			
 
 				# followed by feedforward
 				# if not output layer
 				if layer != num_layers - 1:
 					feed_forward = self.pointwise_feedforward(postprocess, "ffn_%d" % layer, is_training=is_training)
 					feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
-					decoder_input = self.add_and_norm(postprocess, feed_forward, False)
+					decoder_input = self.add_and_norm(postprocess, feed_forward)
 				else:
 					feed_forward = self.pointwise_feedforward(postprocess, "ffn_%d" % layer, is_training=is_training)
 					feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
-					out = self.add_and_norm(postprocess, feed_forward, False)
+					out = self.add_and_norm(postprocess, feed_forward)
 
 					with tf.variable_scope("classify", reuse=tf.AUTO_REUSE):
 						#concat = tf.reshape(out, [-1, self.FLAGS.embeddings_dim * 2])
