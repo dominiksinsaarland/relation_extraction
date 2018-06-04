@@ -91,7 +91,7 @@ class model:
 		self.predictions = tf.cast(tf.argmax(self.preds, axis=-1), tf.int32)
 
 		#print ([n.name for n in tf.get_default_graph().as_graph_def().node])
-		self.get_attention_scores = tf.get_default_graph().get_tensor_by_name("decoder_layers_0_1/multihead_attention_decoder_0_0/attention_softmax:0" % (FLAGS.num_layers - 1))
+		self.get_attention_scores = tf.get_default_graph().get_tensor_by_name("decoder_layers_0_1/multihead_attention_decoder_0_0/attention_softmax:0")
 
 
 	def create_position_lookup(self):
