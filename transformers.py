@@ -267,8 +267,8 @@ class model:
 					out = self.add_and_norm(postprocess, feed_forward, False)
 
 					with tf.variable_scope("classify", reuse=tf.AUTO_REUSE):
-						#concat = tf.reshape(out, [-1, self.FLAGS.embeddings_dim * 2])
-						concat = tf.reduce_sum(out, axis=1)
+						concat = tf.reshape(out, [-1, self.FLAGS.embeddings_dim * 2])
+						#concat = tf.reduce_sum(out, axis=1)
 						#h1 = tf.layers.dense(inputs=concat, units=self.FLAGS.classifier_units, activation=tf.nn.relu)
 						#h1 = tf.layers.dropout(inputs=h1, rate=dropout_rate, training=is_training)
 						logits = tf.layers.dense(concat, units=19, name="out")
