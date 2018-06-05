@@ -162,10 +162,13 @@ if __name__ == "__main__":
 		# write html file from here
 
 		html_string = ""
-		sys.exit(0)
 		# predictions
-		labs = 	sess.run(model.predictions, feed_dict={model.x: preprocessing.test[0], model.y: preprocessing.test[1], model.positions:preprocessing.test[2], model.queries:preprocessing.test[3], model.query_positions:preprocessing.test[4]})
-
+		labs = []
+		for batch in range(len(preprocessing.test[0]) // FLAGS.batch_size):
+			old = FLAGS.batch_size * batch
+			new = FLAGS.batch_size * (batch + 1)
+			this_batch = get_batch(preprocessing.test, old, new)						
+			labs += list(sess.run(model.predictions, feed_dict={model.x: this_batch[0], model.y: this_batch[1], model.positions:this_batch[2], model.queries:this_batch[3],model.query_positions:this_batch[4]}))
 		# convert ids back to words 
 		encs, quers = [[preprocessing.id2word[w] for w in sent if w != 0] for sent in preprocessing.test[0]], [[preprocessing.id2word[w] for w in query] for query in preprocessing.test[3]]
 		labs_true, labs_pred = [id2labels[np.argmax(j)] for j in preprocessing.test[1]], [id2labels[i] for i in labs]
@@ -195,7 +198,7 @@ if __name__ == "__main__":
 			result_file.write(quer[1] + " looks mostly at " + " ".join([enc[i] + " {0:.2f}".format(att_score_q2[i]) for i in indices]) + "\n")
 			result_file.write("\n\n")
 			html_string += write_html_file(enc, att_score_q1, att_score_q2)
-		with open("html_results.html", "w") as outfile:
+		with open("html_results_ace2005.html", "w") as outfile:
 			outfile.write(html_string)
 
 
