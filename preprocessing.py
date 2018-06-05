@@ -6,7 +6,7 @@ class preprocessing:
 	def __init__(self, FLAGS):
 
 		# debug locally
-
+		"""
 		self.record_train = "/home/dominik/Documents/DFKI/Hiwi-master/NemexRelator2010/SemEval2010_task8_all_data/SemEval2010_task8_training/TRAIN_FILE.TXT"
 		self.record_test = "/home/dominik/Documents/DFKI/Hiwi-master/NemexRelator2010/SemEval2010_task8_all_data/SemEval2010_task8_testing_keys/TEST_FILE_FULL.TXT"
 		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B.300d.txt"
@@ -20,7 +20,7 @@ class preprocessing:
 		self.labels_file = "/raid/data/dost01/semeval10_data/labels.txt"
 		self.vocab_file = "/raid/data/dost01/embeddings/glove.6B.300d.txt"
 
-		"""
+
 		self.FLAGS = FLAGS
 
 		self.read_embeddings()
