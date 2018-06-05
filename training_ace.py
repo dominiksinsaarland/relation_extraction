@@ -143,7 +143,12 @@ if __name__ == "__main__":
 				sess.run(model.train_step, feed_dict={model.x: this_batch[0], model.y: this_batch[1], model.positions:this_batch[2], model.queries:this_batch[3],model.query_positions:this_batch[4], model.learning_rate:current_lr}) 
 
 				if current_step % 100 == 0:
-					labs = 	sess.run(model.predictions, feed_dict={model.x: preprocessing.test[0], model.y: preprocessing.test[1], model.positions:preprocessing.test[2], model.queries:preprocessing.test[3], model.query_positions:preprocessing.test[4]}) 
+					labs = []
+					for batch in range(len(preprocessing.test[0]) // FLAGS.batch_size):
+						old = FLAGS.batch_size * batch
+						new = FLAGS.batch_size * (batch + 1)
+						this_batch = get_batch(preprocessing.test, old, new)						
+						labs += list(sess.run(model.predictions, feed_dict={model.x: this_batch[0], model.y: this_batch[1], model.positions:this_batch[2], model.queries:this_batch[3],model.query_positions:this_batch[4]}))
 					acc = sum([1 for i,j in zip(labs, preprocessing.test[1]) if i == np.argmax(j)])/len(preprocessing.test[1])
 					print ("step:", current_step, "acc", acc)			
 					labs = [id2labels[i] for i in labs]
@@ -167,10 +172,10 @@ if __name__ == "__main__":
 
 		# get the attention scores
 		attention_scores = sess.run(model.get_attention_scores, feed_dict={model.x: preprocessing.test[0], model.y: preprocessing.test[1], model.positions:preprocessing.test[2], model.queries:preprocessing.test[3], model.query_positions:preprocessing.test[4]})
-		pos_encs = [[w for w in sent if w != 0] for sent in positions_global]
+		pos_encs = [[w for w in sent if w != 0] for sent in preprocessing.test[2]]
 
 		# iterate through sentences and write the html file
-		for enc, quer, lab_true, lab_pred, att_scores, pos_enc, pos_quer in zip(encs, quers, labs_true, labs_pred, attention_scores, pos_encs, queries_positions_global):
+		for enc, quer, lab_true, lab_pred, att_scores, pos_enc, pos_quer in zip(encs, quers, labs_true, labs_pred, attention_scores, pos_encs, preprocessing.test[4]):
 			pos_q_1 = str(pos_quer[0])
 			pos_q_2 = str(pos_quer[1])
 
