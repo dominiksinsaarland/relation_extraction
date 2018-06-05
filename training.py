@@ -5,19 +5,29 @@ from collections import defaultdict
 def get_batch(tup, old, new):
 	return [x[old:new] for x in tup]
 
-
-def write_html_file(sent, q1, q2):
+def write_html_file(sent, q1, q2, pos_q1, pos_q2, predicted, true):
 	html_string = ""
-	#with open("colors_highlighted.html", "a") as outfile:
-	html_string += "<p>"
-	for w, c1, c2 in zip(sent, q1, q2):
-		html_string += ' <span style="background-color: rgb(255,255,' + str(int(255 - c1 * 255)) + '">' + w + " </span>"
-	html_string += "</p>\n"
-	html_string += "<p>"
-	for w, c1, c2 in zip(sent, q1, q2):
-		html_string += ' <span style="background-color: rgb(255,' + str(int(255 - c2 * 255)) + ',255">' + w + " </span>"
 
+	# make this: "background-color: rgb(255,255,140);border: 1px solid black" around entities
+	#with open("colors_highlighted.html", "a") as outfile:
+	if predicted == true:
+		html_string += '<p> true label: "' + true + '"; predicted label: "' + predicted + '"; correct prediction</p>'
+	else:
+		html_string += '<p> true label: "' + true + '"; predicted label: "' + predicted + '"; wrong prediction</p>'
+	html_string += "<p>"
+	for i,w, c1, c2 in zip(range(len(sent)), sent, q1, q2):
+		if i == pos_q1 - 1:
+			html_string += ' <span style="background-color: rgb(255,255,' + str(int(255 - c1 * 255)) + ');border: 1px solid black">' + w + " </span>"
+		else:
+			html_string += ' <span style="background-color: rgb(255,255,' + str(int(255 - c1 * 255)) + ')">' + w + " </span>"
 	html_string += "</p>\n"
+	html_string += "<p>"
+	for i,w, c1, c2 in zip(range(len(sent)), sent, q1, q2):
+		if i == pos_q2 - 1:
+			html_string += ' <span style="background-color: rgb(255,' + str(int(255 - c2 * 255)) + ',255);border: 1px solid black">'+ w + " </span>"
+		else:
+			html_string += ' <span style="background-color: rgb(255,' + str(int(255 - c2 * 255)) + ',255)">' + w + " </span>"
+	html_string += "<br><br></p>\n"
 	return html_string	
 
 def micro_f1(y_true, y_pred):
@@ -165,10 +175,10 @@ if __name__ == "__main__":
 
 		# get the attention scores
 		attention_scores = sess.run(model.get_attention_scores, feed_dict={model.x: preprocessing.test[0], model.y: preprocessing.test[1], model.positions:preprocessing.test[2], model.queries:preprocessing.test[3], model.query_positions:preprocessing.test[4]})
-		pos_encs = [[w for w in sent if w != 0] for sent in positions_global]
+		pos_encs = [[w for w in sent if w != 0] for sent in preprocessing.test[2]]
 
 		# iterate through sentences and write the html file
-		for enc, quer, lab_true, lab_pred, att_scores, pos_enc, pos_quer in zip(encs, quers, labs_true, labs_pred, attention_scores, pos_encs, queries_positions_global):
+		for enc, quer, lab_true, lab_pred, att_scores, pos_enc, pos_quer in zip(encs, quers, labs_true, labs_pred, attention_scores, pos_encs, preprocessing.test[4]):
 			pos_q_1 = str(pos_quer[0])
 			pos_q_2 = str(pos_quer[1])
 
@@ -187,7 +197,10 @@ if __name__ == "__main__":
 			#indices = att_score_q2.argsort()[-3:][::-1]
 			#result_file.write(quer[1] + " looks mostly at " + " ".join([enc[i] + " {0:.2f}".format(att_score_q2[i]) for i in indices]) + "\n")
 			#result_file.write("\n\n")
-			html_string += write_html_file(enc, att_score_q1, att_score_q2)
+
+
+			# def write_html_file(sent, q1, q2, pos_q1, pos_q2, predicted, true):
+			html_string += write_html_file(enc, att_score_q1, att_score_q2, pos_q_1, pos_q_2, lab_pred, lab_true)
 		with open("html_results.html", "w") as outfile:
 			outfile.write(html_string)
 

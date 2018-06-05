@@ -265,6 +265,7 @@ class model:
 
 		for layer in range(num_layers):
 			with tf.variable_scope("decoder_layers_%d" % layer, reuse=tf.AUTO_REUSE):
+				"""
 				# self attention first
 				self_attention = self.multihead_attention(decoder_input, decoder_input, scope="self_attention_%d" % layer, is_training=is_training)
 				self_attention = tf.layers.dropout(self_attention, rate=dropout_rate, training=is_training)
@@ -274,6 +275,10 @@ class model:
 				attention = self.multihead_attention(postprocess, encoder_input, scope="multihead_attention_decoder_%d" % layer, is_training=is_training)
 				attention = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
 				postprocess = self.add_and_norm(postprocess, attention)			
+				"""
+
+				attention = self.multihead_attention(decoder_input, encoder_input, scope="multihead_attention_decoder_%d" % layer, is_training=is_training)
+				postprocess = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
 
 				# followed by feedforward
 				# if not output layer
