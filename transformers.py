@@ -291,6 +291,6 @@ class model:
 						#concat = tf.reduce_sum(out, axis=1)
 						#h1 = tf.layers.dense(inputs=concat, units=self.FLAGS.classifier_units, activation=tf.nn.relu)
 						#h1 = tf.layers.dropout(inputs=h1, rate=dropout_rate, training=is_training)
-						logits = tf.layers.dense(concat, units=19, name="out")
+						logits = tf.layers.dense(concat, units=self.FLAGS.num_labels, name="out")
 		return logits
 

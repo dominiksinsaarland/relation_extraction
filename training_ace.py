@@ -1,4 +1,4 @@
-from preprocessing import *
+from preprocessing_ace import *
 from transformers import *
 from collections import defaultdict
 
@@ -19,6 +19,7 @@ def write_html_file(sent, q1, q2):
 
 	html_string += "</p>\n"
 	return html_string	
+
 
 def micro_f1(y_true, y_pred):
 	d = defaultdict(int)
@@ -90,7 +91,7 @@ if __name__ == "__main__":
 
 	# some of the flags are not needed anymore
 	#flags.DEFINE_float("learning_rate", 0.001, "") // use adaptive learning rate instead, see explanations below
-	flags.DEFINE_integer("num_labels", 19, "number of target labels")
+	flags.DEFINE_integer("num_labels", 11, "number of target labels")
 	flags.DEFINE_integer("batch_size", 500, "number of batchsize, bigger works better")
 	flags.DEFINE_float("dropout", 0.2, "dropout applied after each layer")
 	#flags.DEFINE_integer("sent_length", 50, "sentence length")
@@ -148,7 +149,7 @@ if __name__ == "__main__":
 					true = [id2labels[np.argmax(i)] for i in preprocessing.test[1]]
 					# to not break the program in the first few epochs because of zero division errors
 					try:
-						print (macro_f1(true, labs))
+						print (micro_f1(true, labs))
 					except Exception as inst:
 						print (str(inst))
 
