@@ -23,6 +23,7 @@ def write_html_file(sent, q1, q2):
 
 def micro_f1(y_true, y_pred):
 	d = defaultdict(int)
+	OTHER_RELATION = "NO_RELATION(Arg-1,Arg-1)"
 	for i,j in zip(y_true, y_pred):
 		if i == j:
 			d[i +"_TP"] += 1
@@ -33,12 +34,12 @@ def micro_f1(y_true, y_pred):
 	FP = 0
 	FN = 0
 	for i,j in d.items():
-		if i.endswith("_TP") and i != args.OTHER_RELATION + "_TP":
+		if i.endswith("_TP") and i != OTHER_RELATION + "_TP":
 			TP += j
-		if i.endswith("_FP") and i != args.OTHER_RELATION + "_FP":
+		if i.endswith("_FP") and i != OTHER_RELATION + "_FP":
 			FP += j
 
-		if i.endswith("_FN") and i != args.OTHER_RELATION + "_FN":
+		if i.endswith("_FN") and i != OTHER_RELATION + "_FN":
 			FN += j
 	Pr = TP/(TP + FP)
 	Rc = TP/(TP + FN)
