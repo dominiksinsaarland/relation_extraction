@@ -12,7 +12,7 @@ class preprocessing:
 
 		self.record_train = "/raid/data/dost01/ace2005/record_train_ace.txt"
 		self.record_test = "/raid/data/dost01/ace2005/record_test_ace.txt"
-		self.labels_file = "/raid/data/dost01/2005/labels_ace2005.txt"
+		self.labels_file = "/raid/data/dost01/ace2005/labels_ace2005.txt"
 		self.vocab_file = "/raid/data/dost01/embeddings/glove.6B.300d.txt"
 		"""
 
