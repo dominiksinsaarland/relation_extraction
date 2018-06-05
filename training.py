@@ -93,7 +93,7 @@ def macro_f1(y_true, y_pred):
 
 if __name__ == "__main__":
 
-        BEST_GPU = find_best_gpu()
+	BEST_GPU = find_best_gpu()
 
 	import os
 	os.environ["CUDA_VISIBLE_DEVICES"] = str(BEST_GPU)
