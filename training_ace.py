@@ -190,8 +190,8 @@ if __name__ == "__main__":
 
 		# iterate through sentences and write the html file
 		for enc, quer, lab_true, lab_pred, att_scores, pos_enc, pos_quer in zip(encs, quers, labs_true, labs_pred, attention_scores, pos_encs, preprocessing.test[4]):
-			pos_q_1 = str(pos_quer[0])
-			pos_q_2 = str(pos_quer[1])
+			pos_q_1 = pos_quer[0]
+			pos_q_2 = pos_quer[1]
 
 
 			att_score_q1 = att_scores[0][:len(enc)]
