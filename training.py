@@ -1,5 +1,5 @@
 from collections import defaultdict
-from find_best_gpu.py import *
+from find_best_gpu import *
 def get_batch(tup, old, new):
 	return [x[old:new] for x in tup]
 
