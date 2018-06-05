@@ -151,7 +151,8 @@ if __name__ == "__main__":
 		model = model(preprocessing, FLAGS)
 		init = tf.global_variables_initializer()
 		current_step = 0
-		with tf.Session() as sess:
+		config = tf.ConfigProto(allow_soft_placement = True)
+		with tf.Session(config=config) as sess:
 			sess.run(init)
 			while current_step < FLAGS.max_steps:
 				p = np.random.permutation(len(preprocessing.train[0]))
