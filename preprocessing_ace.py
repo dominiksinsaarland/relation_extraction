@@ -9,7 +9,6 @@ class preprocessing:
 		# debug locally
 	
 
-
 		self.record_train = "/raid/data/dost01/ace2005/record_train_ace.txt"
 		self.record_test = "/raid/data/dost01/ace2005/record_test_ace.txt"
 		self.labels_file = "/raid/data/dost01/ace2005/labels_ace2005.txt"
@@ -19,8 +18,9 @@ class preprocessing:
 		self.record_train = "/home/dominik/Documents/DFKI/clean_dir/Hiwi-master/NemexRelator2010/features/record_train_ace2005.txt"
 		self.record_test = "/home/dominik/Documents/DFKI/clean_dir/Hiwi-master/NemexRelator2010/features/record_test_ace2005.txt"
 		self.labels_file = "/home/dominik/Documents/DFKI/clean_dir/Hiwi-master/NemexRelator2010/features/labels_ace2005.txt"
-		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B.300d.txt"
+		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B.50d.txt"
 		"""
+
 		self.FLAGS = FLAGS
 
 		self.read_embeddings()
@@ -141,6 +141,8 @@ class preprocessing:
 					if i == e2:
 						queries.append(w)
 					word_ids.append(w)
+				if len(queries) != 2:
+					continue
 				positions = list(range(1,len(word_ids) + 1))
 				X.append(word_ids)
 				X_positions.append(positions)
@@ -180,5 +182,6 @@ if __name__ == "__main__":
 		print ([w for (i,w) in np.ndenumerate(preprocessing.train[2][i]) if w != 0])
 		print ([preprocessing.id2word[w] for (i,w) in np.ndenumerate(preprocessing.train[3][i])])
 		print ([w for (i,w) in np.ndenumerate(preprocessing.train[4][i])])
+	print (np.shape(preprocessing.train[0]), np.shape(preprocessing.train[1]), np.shape(preprocessing.train[2]), np.shape(preprocessing.train[3]), np.shape(preprocessing.train[4]))
 	#print ([p for (i,p) in np.ndenumerate(preprocessing.train[1][:5]) if p != 0])
 	#print (preprocessing.train[0][:5])
