@@ -1,7 +1,5 @@
-from preprocessing import *
-from transformers import *
 from collections import defaultdict
-
+from find_best_gpu.py import *
 def get_batch(tup, old, new):
 	return [x[old:new] for x in tup]
 
@@ -94,6 +92,20 @@ def macro_f1(y_true, y_pred):
 
 
 if __name__ == "__main__":
+
+        BEST_GPU = find_best_gpu()
+
+	import os
+	os.environ["CUDA_VISIBLE_DEVICES"] = str(BEST_GPU)
+
+	# Import must happen afterwards
+
+	# After changing visible devices there will be only 1 available device which gets id 0 by default.
+	# Hence, make sure to always select gpu:0
+	FLAGS.device = '/gpu:0'
+	from preprocessing import *
+	from transformers import *
+
 
 
 	flags = tf.flags
