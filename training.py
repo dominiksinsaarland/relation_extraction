@@ -174,19 +174,19 @@ if __name__ == "__main__":
 
 			att_score_q1 = att_scores[0][:len(enc)]
 			att_score_q2 = att_scores[1][:len(enc)]
-			result_file.write("label true " + lab_true + " label predicted " + lab_pred + " " + str(lab_true == lab_pred) + "\n")
-			result_file.write("query 1 " + quer[0] + " at position " + pos_q_1 +"\n")
-			result_file.write(" ".join([i + "(" + "{0:.2f}".format(j) + ")" for i,j in zip(enc, att_score_q1)]) + "\n")
-			result_file.write("attention sum q1: " + str(sum(att_scores[0])) + "\n")
-			indices = att_score_q1.argsort()[-3:][::-1]
-			result_file.write(quer[0] + " looks at " + " ".join([enc[i] + " {0:.2f}".format(att_score_q1[i]) for i in indices]) + "\n")
-			result_file.write("query 2 " + quer[1] + " at position " + pos_q_2 +"\n")
-			result_file.write(" ".join([i + "(" + "{0:.2f}".format(j) + ")" for i,j in zip(enc, att_score_q2)]) + "\n")
-			result_file.write("attention sum q2: " + str(sum(att_scores[1])) + "\n")
+			#result_file.write("label true " + lab_true + " label predicted " + lab_pred + " " + str(lab_true == lab_pred) + "\n")
+			#result_file.write("query 1 " + quer[0] + " at position " + pos_q_1 +"\n")
+			#result_file.write(" ".join([i + "(" + "{0:.2f}".format(j) + ")" for i,j in zip(enc, att_score_q1)]) + "\n")
+			#result_file.write("attention sum q1: " + str(sum(att_scores[0])) + "\n")
+			#indices = att_score_q1.argsort()[-3:][::-1]
+			#result_file.write(quer[0] + " looks at " + " ".join([enc[i] + " {0:.2f}".format(att_score_q1[i]) for i in indices]) + "\n")
+			#result_file.write("query 2 " + quer[1] + " at position " + pos_q_2 +"\n")
+			#result_file.write(" ".join([i + "(" + "{0:.2f}".format(j) + ")" for i,j in zip(enc, att_score_q2)]) + "\n")
+			#result_file.write("attention sum q2: " + str(sum(att_scores[1])) + "\n")
 
-			indices = att_score_q2.argsort()[-3:][::-1]
-			result_file.write(quer[1] + " looks mostly at " + " ".join([enc[i] + " {0:.2f}".format(att_score_q2[i]) for i in indices]) + "\n")
-			result_file.write("\n\n")
+			#indices = att_score_q2.argsort()[-3:][::-1]
+			#result_file.write(quer[1] + " looks mostly at " + " ".join([enc[i] + " {0:.2f}".format(att_score_q2[i]) for i in indices]) + "\n")
+			#result_file.write("\n\n")
 			html_string += write_html_file(enc, att_score_q1, att_score_q2)
 		with open("html_results.html", "w") as outfile:
 			outfile.write(html_string)
