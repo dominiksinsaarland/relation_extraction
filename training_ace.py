@@ -139,7 +139,6 @@ if __name__ == "__main__":
 				new = FLAGS.batch_size * (batch + 1)
 				# load batch data
 				this_batch = get_batch(train, old, new)
-				print (np.shape(this_batch[0]), np.shape(this_batch[1]), np.shape(this_batch[2]), np.shape(this_batch[3]), np.shape(this_batch[4]))
 				sess.run(model.train_step, feed_dict={model.x: this_batch[0], model.y: this_batch[1], model.positions:this_batch[2], model.queries:this_batch[3],model.query_positions:this_batch[4], model.learning_rate:current_lr}) 
 
 				if current_step % 100 == 0:
@@ -162,7 +161,7 @@ if __name__ == "__main__":
 		# write html file from here
 
 		html_string = ""
-
+		sys.exit(0)
 		# predictions
 		labs = 	sess.run(model.predictions, feed_dict={model.x: preprocessing.test[0], model.y: preprocessing.test[1], model.positions:preprocessing.test[2], model.queries:preprocessing.test[3], model.query_positions:preprocessing.test[4]})
 
