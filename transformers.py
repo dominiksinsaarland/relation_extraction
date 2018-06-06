@@ -124,9 +124,9 @@ class model:
 
 		with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
 			print (inputs.get_shape())
-			h1 = tf.layers.dense(inputs=inputs, units= 4 * self.FLAGS.embeddings_dim, name="feedforward", activation=tf.nn.relu)
+			h1 = tf.layers.dense(inputs=inputs, units= 4 * self.FLAGS.embeddings_dim, kernel_initializer=tf.orthogonal_initializer, name="feedforward", activation=tf.nn.relu)
 			print (h1.get_shape())
-			out = tf.layers.dense(inputs=h1, units= self.FLAGS.embeddings_dim, name="feedforward2")
+			out = tf.layers.dense(inputs=h1, units= self.FLAGS.embeddings_dim, kernel_initializer=tf.orthogonal_initializer, name="feedforward2")
 
 		return out
 
@@ -196,9 +196,9 @@ class model:
 		for head in range(num_heads):
 			with tf.variable_scope(scope + "_" + str(head), reuse=tf.AUTO_REUSE):
 
-				Q = tf.layers.dense(queries, num_units/num_heads, activation=tf.nn.relu, use_bias=False, name="queries")
-				K = tf.layers.dense(keys, num_units/num_heads, activation=tf.nn.relu, use_bias=False, name="keys")
-				V = tf.layers.dense(keys, num_units/num_heads, activation=tf.nn.relu, use_bias=False, name="values")
+				Q = tf.layers.dense(queries, num_units/num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer,  use_bias=False, name="queries")
+				K = tf.layers.dense(keys, num_units/num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer, use_bias=False, name="keys")
+				V = tf.layers.dense(keys, num_units/num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer, use_bias=False, name="values")
 			
 				# decoding step for relation classification
 				# if num_heads = 3, num_units/num_heads = 300/3 = 100
@@ -224,7 +224,7 @@ class model:
 				else:
 					head_i = tf.concat([head_i, x], axis=-1)
 		with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-			x = tf.layers.dense(head_i, num_units, activation=tf.nn.relu, use_bias=False, name="output_projection_matmul")
+			x = tf.layers.dense(head_i, num_units, activation=tf.nn.relu, use_bias=False, kernel_initializer=tf.orthogonal_initializer, name="output_projection_matmul")
 		return x
 
 	def encode_sentence(self, inputs, num_layers, num_heads, is_training=True, dropout_rate=0.1):
