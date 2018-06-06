@@ -279,7 +279,9 @@ class model:
 
 				attention = self.multihead_attention(decoder_input, encoder_input, scope="multihead_attention_decoder_%d" % layer, is_training=is_training)
 				postprocess = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
-
+				concat = tf.reshape(postprocess, [-1, self.FLAGS.embeddings_dim * 2])
+				logits = tf.layers.dense(concat, units=self.FLAGS.num_labels, name="out")
+				return logits
 				# followed by feedforward
 				# if not output layer
 				if layer != num_layers - 1:
