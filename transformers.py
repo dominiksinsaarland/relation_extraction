@@ -260,7 +260,7 @@ class model:
 
 				"""
 
-				inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=postprocess, y=tf.zeros_like(self.mask))
+				inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=attention, y=tf.zeros_like(self.mask))
 		return inputs
 
 	def decode_sentence(self, decoder_input, encoder_input, num_layers, num_heads, is_training=True, dropout_rate=0.1):
