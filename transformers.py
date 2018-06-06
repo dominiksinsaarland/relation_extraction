@@ -53,6 +53,7 @@ class model:
 		#self.decoder_inputs = tf.layers.dropout(self.decoder_inputs, rate=0.1, training=True)
 
 		self.decoder_inputs = tf.add(self.decoder_inputs, tf.nn.embedding_lookup(self.position_lookup, self.query_positions))
+		self.decoder_inputs = tf.reduce_sum(self.decoder_inputs, axis=1)
 
 		# encode sentence
 		self.encoded = self.encode_sentence(self.inputs, FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
@@ -279,7 +280,7 @@ class model:
 
 				attention = self.multihead_attention(decoder_input, encoder_input, scope="multihead_attention_decoder_%d" % layer, is_training=is_training)
 				postprocess = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
-				concat = tf.reshape(postprocess, [-1, self.FLAGS.embeddings_dim * 2])
+				concat = tf.reshape(postprocess, [-1, self.FLAGS.embeddings_dim])
 				logits = tf.layers.dense(concat, units=self.FLAGS.num_labels, name="out")
 				return logits
 				# followed by feedforward
