@@ -54,6 +54,7 @@ class model:
 
 		self.decoder_inputs = tf.add(self.decoder_inputs, tf.nn.embedding_lookup(self.position_lookup, self.query_positions))
 		self.decoder_inputs = tf.reduce_sum(self.decoder_inputs, axis=1)
+		self.decoder_inputs = tf.expand_dims(decoder_inputs, axis=1)
 
 		# encode sentence
 		self.encoded = self.encode_sentence(self.inputs, FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
