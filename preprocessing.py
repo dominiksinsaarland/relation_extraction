@@ -4,12 +4,12 @@ from nltk import word_tokenize
 
 class preprocessing:
 	def __init__(self, FLAGS):
+		"""
 
 		# debug locally
-		"""
 		self.record_train = "/home/dominik/Documents/DFKI/Hiwi-master/NemexRelator2010/SemEval2010_task8_all_data/SemEval2010_task8_training/TRAIN_FILE.TXT"
 		self.record_test = "/home/dominik/Documents/DFKI/Hiwi-master/NemexRelator2010/SemEval2010_task8_all_data/SemEval2010_task8_testing_keys/TEST_FILE_FULL.TXT"
-		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B.300d.txt"
+		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B.100d.txt"
 		self.labels_file = "../../labels.txt"
 		"""
 
@@ -18,7 +18,8 @@ class preprocessing:
 		self.record_train = "/raid/data/dost01/semeval10_data/TRAIN_FILE.TXT"
 		self.record_test = "/raid/data/dost01/semeval10_data/TEST_FILE_FULL.TXT"
 		self.labels_file = "/raid/data/dost01/semeval10_data/labels.txt"
-		self.vocab_file = "/raid/data/dost01/embeddings/glove.6B.300d.txt"
+		self.vocab_file = "/raid/data/dost01/embeddings/glove.6B.100d.txt"
+
 
 
 		self.FLAGS = FLAGS
@@ -304,7 +305,7 @@ if __name__ == "__main__":
 	flags.DEFINE_integer("num_heads",1, "num heads per layer")
 	flags.DEFINE_integer("num_epochs",20, "")
 	flags.DEFINE_integer("min_length", 0, "min length of encoded sentence")
-	flags.DEFINE_integer("embeddings_dim", 50, "number of dimensions in word embeddings")
+	flags.DEFINE_integer("embeddings_dim", 100, "number of dimensions in word embeddings")
 	flags.DEFINE_float("l2_lambda", 0.0001, "")
 	flags.DEFINE_integer("max_gradient_norm", 5, "")
 	flags.DEFINE_integer("classifier_units", 100, "")

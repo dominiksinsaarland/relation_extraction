@@ -53,8 +53,8 @@ class model:
 		#self.decoder_inputs = tf.layers.dropout(self.decoder_inputs, rate=0.1, training=True)
 
 		self.decoder_inputs = tf.add(self.decoder_inputs, tf.nn.embedding_lookup(self.position_lookup, self.query_positions))
-		self.decoder_inputs = tf.reduce_sum(self.decoder_inputs, axis=1)
-		self.decoder_inputs = tf.expand_dims(self.decoder_inputs, axis=1)
+		#self.decoder_inputs = tf.reduce_sum(self.decoder_inputs, axis=1)
+		#self.decoder_inputs = tf.expand_dims(self.decoder_inputs, axis=1)
 
 		# encode sentence
 		self.encoded = self.encode_sentence(self.inputs, FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
@@ -249,7 +249,7 @@ class model:
 				print (postprocess.get_shape())
 
 				# feedforward step
-				"""
+
 				feed_forward = self.pointwise_feedforward(postprocess, "feedforward_%d" % layer, is_training=is_training)
 
 				feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
@@ -258,9 +258,9 @@ class model:
 				# set padding tokens back to zero
 				inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=inputs, y=tf.zeros_like(self.mask))
 
-				"""
 
-				inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=attention, y=tf.zeros_like(self.mask))
+
+				#inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=attention, y=tf.zeros_like(self.mask))
 		return inputs
 
 	def decode_sentence(self, decoder_input, encoder_input, num_layers, num_heads, is_training=True, dropout_rate=0.1):
@@ -271,7 +271,7 @@ class model:
 
 		for layer in range(num_layers):
 			with tf.variable_scope("decoder_layers_%d" % layer, reuse=tf.AUTO_REUSE):
-				"""
+
 				# self attention first
 				self_attention = self.multihead_attention(decoder_input, decoder_input, scope="self_attention_%d" % layer, is_training=is_training)
 				self_attention = tf.layers.dropout(self_attention, rate=dropout_rate, training=is_training)
@@ -288,6 +288,7 @@ class model:
 				concat = tf.reshape(postprocess, [-1, self.FLAGS.embeddings_dim])
 				logits = tf.layers.dense(concat, units=self.FLAGS.num_labels, name="out")
 				return logits
+				"""
 				# followed by feedforward
 				# if not output layer
 				if layer != num_layers - 1:
