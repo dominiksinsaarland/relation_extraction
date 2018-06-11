@@ -118,7 +118,7 @@ if __name__ == "__main__":
 		flags.DEFINE_float("dropout", 0.3, "dropout applied after each layer")
 		#flags.DEFINE_integer("sent_length", 50, "sentence length")
 		flags.DEFINE_integer("num_layers", 1, "num layers for encoding/decoding")
-		flags.DEFINE_integer("num_heads",1, "num heads per layer")
+		flags.DEFINE_integer("num_heads",2, "num heads per layer")
 		#flags.DEFINE_integer("num_epochs",20, "")
 		#flags.DEFINE_integer("min_length", 0, "min length of encoded sentence")
 		flags.DEFINE_integer("embeddings_dim", 100, "number of dimensions in word embeddings")

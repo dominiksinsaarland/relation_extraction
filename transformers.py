@@ -63,13 +63,13 @@ class model:
 		self.logits = self.decode_sentence(self.decoder_inputs, self.encoded,  FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
 
 		# use crossentropy or mean squared error?
-		#self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.y))
+		self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.y))
 
 		# add l2 losses?
 		#self.l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.FLAGS.l2_lambda
 		#self.cost += self.l2_losses
-
-		self.cost = tf.reduce_mean(tf.losses.mean_squared_error(self.y, tf.nn.softmax(self.logits)))
+		  
+		#self.cost = tf.reduce_mean(tf.losses.mean_squared_error(self.y, tf.nn.softmax(self.logits)))
 		self.learning_rate = tf.placeholder(tf.float32, shape=[])
 
 		"""
@@ -296,11 +296,12 @@ class model:
 					feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
 					decoder_input = self.add_and_norm(postprocess, feed_forward)
 				else:
-					feed_forward = self.pointwise_feedforward(postprocess, "ffn_%d" % layer, is_training=is_training)
-					feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
-					out = self.add_and_norm(postprocess, feed_forward)
+					#feed_forward = self.pointwise_feedforward(postprocess, "ffn_%d" % layer, is_training=is_training)
+					#feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
+					#out = self.add_and_norm(postprocess, feed_forward)
 
 					with tf.variable_scope("classify", reuse=tf.AUTO_REUSE):
+						out = postprocess
 						concat = tf.reshape(out, [-1, self.FLAGS.embeddings_dim * 2])
 						#concat = tf.reduce_sum(out, axis=1)
 						#h1 = tf.layers.dense(inputs=concat, units=self.FLAGS.classifier_units, activation=tf.nn.relu)
