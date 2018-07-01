@@ -7,6 +7,7 @@ https://www.github.com/kyubyong/transformer
 import tensorflow as tf
 import os
 import numpy as np
+import sys
 
 
 
@@ -21,68 +22,63 @@ class model:
 		self.y = tf.placeholder(tf.int32, shape=[None, None])
 		# positions of tokens in sentence to encode
 		self.positions = tf.placeholder(tf.int32, shape=[None, None])
-		# queries (= [e1, e2])
-		self.queries = tf.placeholder(tf.int32, shape=[None, 2])
+		# queries (= [e1, e2]), already embedded, if query is unknown or multi-word-expression, it gets averaged
+		self.queries = tf.placeholder(tf.float32, shape=[None, 2, self.FLAGS.embeddings_dim])
 		# position of queries
 		self.query_positions = tf.placeholder(tf.int32, shape=[None, 2])
 
-
 		# convert embedding matrices to tf.tensors
-		self.embeddings = tf.get_variable("embedding", np.shape(self.preprocessing.embs), initializer=tf.constant_initializer(self.preprocessing.embs),dtype=tf.float32, trainable=False)
+		with tf.variable_scope("embeddings",reuse=tf.AUTO_REUSE):
+			self.embeddings = tf.get_variable("embedding", np.shape(self.preprocessing.embs), initializer=tf.constant_initializer(self.preprocessing.embs),dtype=tf.float32, trainable=False)
 		self.position_lookup = tf.get_variable("positions", np.shape(self.position_enc), initializer=tf.constant_initializer(self.position_enc), dtype=tf.float32, trainable=False)
 
 		# prepare encoder
 		self.inputs = tf.nn.embedding_lookup(self.embeddings, self.x)
 		self.mask = tf.to_float(tf.where(tf.equal(self.inputs, tf.zeros_like(self.inputs)), x=tf.zeros_like(self.inputs),y=tf.ones_like(self.inputs)))
 
-		# normalize input?
-		#self.inputs = self.normalize(self.inputs)
-		#self.inputs = tf.layers.dropout(self.inputs, rate=0.1, training=True)
+		# normalize input
+		self.inputs = self.normalize(self.inputs)
 
 		self.position_inputs = tf.nn.embedding_lookup(self.position_lookup, self.positions)
+
+		# add positions to embedded input
 		self.inputs = tf.add(self.inputs, self.position_inputs)
 
-
-
+		# add dropout
+		self.dropout_inputs = tf.layers.dropout(self.inputs, rate=FLAGS.dropout + 0.15, training=True)
 		
 		# prepare decoder
-		self.decoder_inputs = tf.nn.embedding_lookup(self.embeddings, self.queries)
-		
-		# normalize input?
-		#self.decoder_inputs = self.normalize(self.decoder_inputs)
-		#self.decoder_inputs = tf.layers.dropout(self.decoder_inputs, rate=0.1, training=True)
+		self.decoder_inputs = self.queries
+		# normalize decoder input
+		self.decoder_inputs = self.normalize(self.decoder_inputs)
 
+		# add positions and dropout
 		self.decoder_inputs = tf.add(self.decoder_inputs, tf.nn.embedding_lookup(self.position_lookup, self.query_positions))
-		#self.decoder_inputs = tf.reduce_sum(self.decoder_inputs, axis=1)
-		#self.decoder_inputs = tf.expand_dims(self.decoder_inputs, axis=1)
+		self.dropout_decoder_inputs = tf.layers.dropout(self.decoder_inputs, FLAGS.dropout + 0.15, training=True)
 
 		# encode sentence
-		self.encoded = self.encode_sentence(self.inputs, FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
+		self.encoded = self.encode_sentence(self.dropout_inputs, FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
 
 		# query encoded sentence
-		self.logits = self.decode_sentence(self.decoder_inputs, self.encoded,  FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
+		self.logits = self.decode_sentence(self.dropout_decoder_inputs, self.encoded,  FLAGS.num_layers, FLAGS.num_heads, dropout_rate=FLAGS.dropout)
 
-		# use crossentropy or mean squared error?
-		self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.y))
+		with tf.name_scope('cross_entropy'):
+			self.cost = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=self.logits, labels=self.y))
+			if self.FLAGS.l2_lambda != 0:
+				self.l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.FLAGS.l2_lambda
+				self.cost += self.l2_losses
+			# add l2 loss for classification layer
+			l2_loss = tf.losses.get_regularization_loss()
+			self.cost += l2_loss
+			tf.summary.scalar('cross_entropy', self.cost)
+		with tf.name_scope('accuracy'):
+			correct_prediction = tf.equal(tf.argmax(self.y, 1), tf.argmax(self.logits, 1))
+			accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+			tf.summary.scalar('accuracy', accuracy)
 
-		# add l2 losses?
-		#self.l2_losses = tf.add_n([tf.nn.l2_loss(v) for v in tf.trainable_variables() if 'bias' not in v.name]) * self.FLAGS.l2_lambda
-		#self.cost += self.l2_losses
-		  
-		#self.cost = tf.reduce_mean(tf.losses.mean_squared_error(self.y, tf.nn.softmax(self.logits)))
 		self.learning_rate = tf.placeholder(tf.float32, shape=[])
 
-		"""
-		# do gradient clipping?
-		params = tf.trainable_variables()
-		gradients = tf.gradients(self.cost, params)
-
-		max_gradient_norm = self.FLAGS.max_gradient_norm
-		clipped_gradients, _ = tf.clip_by_global_norm(gradients, max_gradient_norm)
-
-		optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.9, beta2=0.98,epsilon=1e-09)
-		self.train_step = optimizer.apply_gradients(zip(clipped_gradients, params))
-		"""
+		# train step
 		self.train_step = tf.train.AdamOptimizer(learning_rate=self.learning_rate, beta1=0.9, beta2=0.98,epsilon=1e-09).minimize(self.cost)
 
 		# predictions
@@ -91,9 +87,24 @@ class model:
 		
 		self.preds = tf.nn.softmax(self.preds)
 		self.predictions = tf.cast(tf.argmax(self.preds, axis=-1), tf.int32)
+		"""
+		with open("variables_graph.txt", "w") as outfile:
+			outfile.write("\n".join([n.name for n in tf.get_default_graph().as_graph_def().node]))
+		"""
 
-		#print ([n.name for n in tf.get_default_graph().as_graph_def().node])
-		self.get_attention_scores = tf.get_default_graph().get_tensor_by_name("decoder_layers_0_1/multihead_attention_decoder_0_0/attention_softmax:0")
+		# get attention scores
+		self.get_attention_scores_0 = tf.get_default_graph().get_tensor_by_name("decoder_layers_1/multihead_attention_decoder_1_0/attention_softmax:0")
+		self.get_attention_scores_1 = tf.get_default_graph().get_tensor_by_name("decoder_layers_1/multihead_attention_decoder_1_1/attention_softmax:0")
+		self.get_attention_scores_2 = tf.get_default_graph().get_tensor_by_name("decoder_layers_1/multihead_attention_decoder_1_2/attention_softmax:0")
+		self.get_attention_scores_3 = tf.get_default_graph().get_tensor_by_name("decoder_layers_1/multihead_attention_decoder_1_3/attention_softmax:0")
+
+		# logging progress in tensorboard
+		for var in tf.trainable_variables():
+			self.variable_summaries(var)
+			tf.summary.histogram(var.name, var)
+		self.merged = tf.summary.merge_all()
+		self.train_writer = tf.summary.FileWriter(self.FLAGS.summaries_dir + '/train', graph=tf.get_default_graph())
+		self.test_writer = tf.summary.FileWriter(FLAGS.summaries_dir + '/test', graph=tf.get_default_graph())
 
 
 	def create_position_lookup(self):
@@ -139,38 +150,14 @@ class model:
 		itself
 		"""
 		inputs = tf.add(old_inputs, inputs)
-		"""
-		if paddings:
-			x = tf.multiply(inputs,self.mask)
-			non_paddings = tf.reduce_sum(self.mask)
-			all_elems = tf.reduce_sum(tf.ones_like(self.mask))
-			mean = tf.reduce_sum(x, keep_dims=True) * all_elems / non_paddings
-			mean_mask = tf.ones_like(x) * mean
-			
-			variance_mask = tf.where(tf.equal(x, self.mask), x=mean_mask, y=x)
-			variance = tf.reduce_sum(tf.square(variance_mask - mean), axis=[-1], keep_dims=True) / non_paddings
-			norm_x = (x - mean) * tf.rsqrt(variance + 1e-9)
-		else:
-			x = inputs
-			mean = tf.reduce_mean(x, axis=[-1], keep_dims=True)
-			variance = tf.reduce_mean(tf.square(x - mean), axis=[-1], keep_dims=True)
-			norm_x = (x - mean) * tf.rsqrt(variance + 1e-9)
-
-		return norm_x
-		"""
 		return self.normalize(inputs)
 
-
-	def normalize(self, inputs, epsilon = 1e-6, scope="layer_norm", reuse=None):
+	def normalize(self, inputs, epsilon = 1e-9, scope="layer_norm", reuse=None):
 		with tf.variable_scope(scope, reuse=reuse):
 			inputs_shape = inputs.get_shape()
 			params_shape = inputs_shape[-1:]
 	
 			mean, variance = tf.nn.moments(inputs, [-1], keep_dims=True)
-			print ("scope", scope)
-			print ("layer norm shapes", mean.get_shape(), variance.get_shape())
-			#beta= tf.Variable(tf.zeros(params_shape))
-			#gamma = tf.Variable(tf.ones(params_shape))
 			normalized = (inputs - mean) / ( (variance + epsilon) ** (.5) )
 			outputs = normalized		
 		return outputs
@@ -196,36 +183,31 @@ class model:
 
 		for head in range(num_heads):
 			with tf.variable_scope(scope + "_" + str(head), reuse=tf.AUTO_REUSE):
+				# different attention heads
+				Q = tf.layers.dense(queries, num_units//num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer,  use_bias=False, name="queries")
+				K = tf.layers.dense(keys, num_units//num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer, use_bias=False, name="keys")
+				V = tf.layers.dense(keys, num_units//num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer, use_bias=False, name="values")
 
-				Q = tf.layers.dense(queries, num_units/num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer,  use_bias=False, name="queries")
-				K = tf.layers.dense(keys, num_units/num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer, use_bias=False, name="keys")
-				V = tf.layers.dense(keys, num_units/num_heads, activation=tf.nn.relu, kernel_initializer=tf.orthogonal_initializer, use_bias=False, name="values")
-			
-				# decoding step for relation classification
-				# if num_heads = 3, num_units/num_heads = 300/3 = 100
-				# Q = [batch_size, 2, 100] // because we only have two queries
-				# K = [batch_size, sent_length, 100]
-				# V = [batch_size, sent_length, 100]
-
+				# attention scores, matmul query and keys
 				x = tf.matmul(Q, K, transpose_b=True)
 				# outputs are [batch_size, 2, sent_length]
 
-				# scaling
+				# scaling down
 				x = x / (K.get_shape().as_list()[-1] ** 0.5)
 
-				#mask_softmax = tf.where(tf.greater(outputs, tf.zeros_like(outputs)), x=outputs, y=tf.ones_like(outputs) * -100000)
-				mask_softmax = tf.where(tf.equal(x, tf.zeros_like(x)), x=tf.ones_like(x) * -10000000, y=x)
+				# mask padding tokens
+				mask_softmax = tf.where(tf.equal(x, tf.zeros_like(x)), x=tf.ones_like(x) * -sys.maxsize, y=x)
 				x = tf.nn.softmax(mask_softmax, name="attention_softmax")
-				# rescale
 				x = tf.matmul(x, V)
 				# outputs are [batch_size, 2, 100]
 				# concat intermediate results
 				if head == 0:
-					head_i = x
+					attention_heads = x
 				else:
-					head_i = tf.concat([head_i, x], axis=-1)
+					attention_heads = tf.concat([attention_heads, x], axis=-1)
+		# output projection
 		with tf.variable_scope(scope, reuse=tf.AUTO_REUSE):
-			x = tf.layers.dense(head_i, num_units, activation=tf.nn.relu, use_bias=False, kernel_initializer=tf.orthogonal_initializer, name="output_projection_matmul")
+			x = tf.layers.dense(attention_heads, num_units, activation=tf.nn.relu, use_bias=False, kernel_initializer=tf.orthogonal_initializer, name="output_projection_matmul")
 		return x
 
 	def encode_sentence(self, inputs, num_layers, num_heads, is_training=True, dropout_rate=0.1):
@@ -260,8 +242,21 @@ class model:
 
 
 
-				#inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=attention, y=tf.zeros_like(self.mask))
+				#inputs = tf.where(tf.equal(self.mask, tf.ones_like(self.mask)), x=postprocess, y=tf.zeros_like(self.mask))
 		return inputs
+
+	def variable_summaries(self, var):
+		"""Attach a lot of summaries to a Tensor (for TensorBoard visualization)."""
+		with tf.name_scope('summaries'):
+			mean = tf.reduce_mean(var)
+			tf.summary.scalar('mean', mean)
+			with tf.name_scope('stddev'):
+				stddev = tf.sqrt(tf.reduce_mean(tf.square(var - mean)))
+			tf.summary.scalar('stddev', stddev)
+			tf.summary.scalar('max', tf.reduce_max(var))
+			tf.summary.scalar('min', tf.reduce_min(var))
+			tf.summary.histogram(var.name, var)
+
 
 	def decode_sentence(self, decoder_input, encoder_input, num_layers, num_heads, is_training=True, dropout_rate=0.1):
 		"""
@@ -280,32 +275,25 @@ class model:
 				# then multi head attention over encoded input
 				attention = self.multihead_attention(postprocess, encoder_input, scope="multihead_attention_decoder_%d" % layer, is_training=is_training)
 				attention = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
-				postprocess = self.add_and_norm(postprocess, attention)			
-				"""
+				postprocess = self.add_and_norm(postprocess, attention)		
 
-				attention = self.multihead_attention(decoder_input, encoder_input, scope="multihead_attention_decoder_%d" % layer, is_training=is_training)
-				postprocess = tf.layers.dropout(attention, rate=dropout_rate, training=is_training)
-				concat = tf.reshape(postprocess, [-1, self.FLAGS.embeddings_dim])
-				logits = tf.layers.dense(concat, units=self.FLAGS.num_labels, name="out")
-				return logits
-				"""
 				# followed by feedforward
-				# if not output layer
-				if layer != num_layers - 1:
-					feed_forward = self.pointwise_feedforward(postprocess, "ffn_%d" % layer, is_training=is_training)
-					feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
-					decoder_input = self.add_and_norm(postprocess, feed_forward)
-				else:
-					#feed_forward = self.pointwise_feedforward(postprocess, "ffn_%d" % layer, is_training=is_training)
-					#feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
-					#out = self.add_and_norm(postprocess, feed_forward)
+				feed_forward = self.pointwise_feedforward(postprocess, "ffn_%d" % layer, is_training=is_training)
+				feed_forward = tf.layers.dropout(feed_forward, rate=dropout_rate, training=is_training)
+				decoder_input = self.add_and_norm(postprocess, feed_forward)
+		concat = tf.reshape(decoder_input, [-1, self.FLAGS.embeddings_dim * 2])
+		with tf.variable_scope("classify", reuse=tf.AUTO_REUSE):
+			# classification layer
+			"""
+			# rnn on top works too, might be very interesting for n-ary relations!
+			cell_fw = tf.contrib.rnn.LSTMCell(50)
+			cell_fw = tf.contrib.rnn.DropoutWrapper(cell_fw, output_keep_prob=1-self.FLAGS.dropout)
+			outputs, state = tf.nn.dynamic_rnn(cell_fw, decoder_input, dtype=tf.float32)
+			print (decoder_input.get_shape())
+			logits = tf.layers.dense(state.h, units=self.FLAGS.num_labels, name="out")
+			"""
 
-					with tf.variable_scope("classify", reuse=tf.AUTO_REUSE):
-						out = postprocess
-						concat = tf.reshape(out, [-1, self.FLAGS.embeddings_dim * 2])
-						#concat = tf.reduce_sum(out, axis=1)
-						#h1 = tf.layers.dense(inputs=concat, units=self.FLAGS.classifier_units, activation=tf.nn.relu)
-						#h1 = tf.layers.dropout(inputs=h1, rate=dropout_rate, training=is_training)
-						logits = tf.layers.dense(concat, units=self.FLAGS.num_labels, name="out")
+			logits = tf.layers.dense(concat, units=self.FLAGS.num_labels, name="out", kernel_regularizer=tf.contrib.layers.l2_regularizer(scale=0.05))
+
 		return logits
 
