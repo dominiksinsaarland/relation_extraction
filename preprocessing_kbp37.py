@@ -2,33 +2,37 @@ import numpy as np
 import tensorflow as tf
 from nltk import word_tokenize
 import time
-class preprocessing:
+class preprocessing_kbp37:
 	def __init__(self, FLAGS):
 
 		# debug locally
-		"""
 
-		self.record_train = "/home/dominik/Documents/DFKI/Hiwi-master/NemexRelator2010/SemEval2010_task8_all_data/SemEval2010_task8_training/TRAIN_FILE.TXT"
-		self.record_test = "/home/dominik/Documents/DFKI/Hiwi-master/NemexRelator2010/SemEval2010_task8_all_data/SemEval2010_task8_testing_keys/TEST_FILE_FULL.TXT"
-		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B." + str(FLAGS.embeddings_dim) + "d.txt"
-		self.labels_file = "../../labels.txt"
 
-		"""
 
-		self.record_train = "/raid/data/dost01/semeval10_data/TRAIN_FILE.TXT"
-		self.record_test = "/raid/data/dost01/semeval10_data/TEST_FILE_FULL.TXT"
-		self.labels_file = "/raid/data/dost01/semeval10_data/labels.txt"
 		self.vocab_file = "/raid/data/dost01/embeddings/glove.6B." + str(FLAGS.embeddings_dim) + "d.txt"
+		self.record_train = "/raid/data/dost01/kbp37/kbp37_train.txt"
+		self.record_dev = "/raid/data/dost01/kbp37/kbp37_dev.txt"
+		self.record_test = "/raid/data/dost01/kbp37/kbp37_test.txt"
+		self.labels_file = "/raid/data/dost01/kbp37/labels.txt"
 
-		self.oov_file = open("OOVS.txt", "w")
+		"""
+		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B." + str(FLAGS.embeddings_dim) + "d.txt"
+		self.record_train = "/home/dominik/Documents/DFKI/kbp37/kbp37_train.txt"
+		self.record_dev = "/home/dominik/Documents/DFKI/kbp37/kbp37_dev.txt"
+		self.record_test = "/home/dominik/Documents/DFKI/kbp37/kbp37_test.txt"
+		self.labels_file = "/home/dominik/Documents/DFKI/kbp37/labels.txt"
+		"""
 
+
+		self.oov_file = open("OOVS_kbp37.txt", "w")
 
 		self.FLAGS = FLAGS
-
 
 		self.read_embeddings()
 
 		self.train = self.read_records(self.record_train)
+		self.dev = self.read_records(self.record_dev)
+		self.train = (self.train[0] + self.dev[0], np.concatenate((self.train[1], self.dev[1])), self.train[2] + self.dev[2], np.concatenate((self.train[3], self.dev[3])), np.concatenate((self.train[4], self.dev[4])))
 
 		self.max_length = max([len(x) for x in self.train[0]])
 		xs = np.asarray([np.concatenate((tmp, np.zeros(self.max_length - len(tmp)))) for tmp in self.train[0]])
@@ -44,7 +48,7 @@ class preprocessing:
 		"""
 
 
-		self.test = self.read_records(self.record_test)	
+		self.test = self.read_records(self.record_test)
 		self.sentences_info = self.test[-1]
 		self.max_length_test = max([len(x) for x in self.test[0]])
 		xs = np.asarray([np.concatenate((tmp, np.zeros(self.max_length_test - len(tmp)))) for tmp in self.test[0]])
@@ -52,7 +56,9 @@ class preprocessing:
 		self.test = (xs, self.test[1], positions, self.test[3], self.test[4])
 		print ([np.shape(x) for x in self.train])
 		print ([np.shape(x) for x in self.test])
-		#print (self.sentences_info)
+		for i in self.sentences_info[:5]:
+			print (i)
+
 
 	def read_embeddings(self):
 		"""
@@ -107,6 +113,10 @@ class preprocessing:
 			elif w.startswith("www."):
 				return [self.word2id["url"]]
 			split = "".join([c if c.isalnum() else " " for c in w]).split()
+			if len(split) > 3:
+				print (w)
+			if not split:
+				return [self.word2id["__UNKNOWN__"]]
 			if split[-1] not in self.word2id:
 				self.oov_file.write(w + "\n")
 				return [self.word2id["__UNKNOWN__"]]
@@ -124,40 +134,37 @@ class preprocessing:
 			self.oov_file.write(w + "\n")
 			return [self.word2id["__UNKNOWN__"]]
 
-
 	def tokenize(self, line):
-		sent = line.strip().split("\t")[1][1:-1]
-		sent = word_tokenize(sent)
-
-		# remove html tags and seperate in "[context_left] [e1] [context_mid] [e2] [context_right]
+		sent = line.strip().split()[2:-1]
 
 		for i, w in enumerate(sent):
-			if "".join(sent[i:i+3]) == "<e1>":
+			if w == "<e1>":
 				context_left = sent[:i]
-				start_e1 = i + 3
+				start_e1 = i + 1
 				break
 		i = start_e1
 		for w in sent[start_e1:]:
-			if "".join(sent[i:i+3]) == "</e1>":
+			if w == "</e1>":
 				e1 = sent[start_e1:i]
-				end_e1 = i + 3	
+				end_e1 = i + 1
 				break					
 			i += 1
 		i = end_e1
 		for w in sent[end_e1:]:
-			if "".join(sent[i:i+3]) == "<e2>":
+			if w == "<e2>":
 				context_mid = sent[end_e1:i]
-				start_e2 = i + 3
+				start_e2 = i + 1
 				break
 			i += 1
 		i = start_e2
 		for w in sent[start_e2:]:
-			if "".join(sent[i:i+3]) == "</e2>":
+			if w == "</e2>":
 				e2 = sent[start_e2:i]
-				end_e2 = i + 3
+				end_e2 = i + 1
 			i += 1
 		context_right = sent[end_e2:]
 		return context_left, e1, context_mid, e2, context_right
+
 
 	def read_records(self, fn):
 		with open(self.labels_file) as labs:
@@ -171,14 +178,19 @@ class preprocessing:
 		X, y = [], []
 		X_queries, X_positions, X_position_of_queries = [], [], []
 		sentences = []
-		if "TRAIN" in fn:
-			outfile = open("tokenized_and_lookup.txt", "w")
+		if "train" in fn:
+			outfile = open("tokenized_and_lookup_kbp37.txt", "w")
 
 		with open(fn) as infile:
 			for line in infile:
 				if counter % 4 == 0:
 					context_left, e1, context_mid, e2, context_right = self.tokenize(line)
+					flag_pass = False
 
+					if not e1 or not e2:
+						counter += 1
+						flag_pass = True
+						continue
 					tmp = context_left + e1 + context_mid + e2 + context_right
 					tmp = tmp[:-1]
 					word_ids = []
@@ -241,6 +253,7 @@ class preprocessing:
 					tmp = word_ids
 
 
+
 					if self.FLAGS.use_whole_sentence == "no":
 						# TO GET ONLY [E1, ..., E2]
 						#tmp = word_ids[qp_1 - 1:qp_2]
@@ -253,7 +266,7 @@ class preprocessing:
 					#print (tmp, positions, queries, query_positions)
 					#
 					X.append(tmp)
-					if "TRAIN" in fn:
+					if "train" in fn:
 						outfile.write(line + " ".join([self.id2word[w] for w in tmp]) + "\n")
 					X_positions.append(positions)
 					X_queries.append(queries)
@@ -263,14 +276,13 @@ class preprocessing:
 
 				elif counter % 4 == 1:
 					label = line.strip()
-					#if pass_flag:
-					#	counter += 1
-					#	continue
+					if flag_pass:
+						counter += 1
+						continue
 					#print (label, fn))
-
 					y.append(self.create_one_hot(len(labels), labels[label]))
 					"""
-					if "TRAIN" in fn:
+					if "train" in fn.lower():
 					#if "train" in fn.lower() and counter < 4 * 7500:
 						if label != "Other":
 							y.append(self.create_one_hot(len(labels), labels_inv[label]))
@@ -282,7 +294,6 @@ class preprocessing:
 							X_queries.append(queries)
 							X_position_of_queries.append(query_positions)
 					"""
-
 				counter += 1
 		print (np.shape(y), np.shape(X_queries), np.shape(X_position_of_queries))
 		return X, np.asarray(y), X_positions, np.asarray(X_queries), np.asarray(X_position_of_queries), sentences
@@ -310,9 +321,10 @@ if __name__ == "__main__":
 	flags.DEFINE_float("l2_lambda", 0.0001, "")
 	flags.DEFINE_integer("max_gradient_norm", 5, "")
 	flags.DEFINE_integer("classifier_units", 100, "")
+	flags.DEFINE_string("use_whole_sentence", "no", "")
 
 	FLAGS = flags.FLAGS
-	preprocessing = preprocessing(FLAGS)
+	preprocessing = preprocessing_kbp37(FLAGS)
 	for i in range(5):
 		print ([w for (i,w) in np.ndenumerate(preprocessing.train[0][i]) if preprocessing.id2word[w] != "__PADDING__"])
 		print ([preprocessing.id2word[w] for (i,w) in np.ndenumerate(preprocessing.train[0][i]) if preprocessing.id2word[w] != "__PADDING__"])

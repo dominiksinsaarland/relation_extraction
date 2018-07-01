@@ -1,68 +1,73 @@
 import numpy as np
 import tensorflow as tf
 from nltk import word_tokenize
+import time
 import ast
-
-class preprocessing:
+class preprocessing_ace:
 	def __init__(self, FLAGS):
 
 		# debug locally
-	
 
-		self.record_train = "/raid/data/dost01/ace2005/record_train_ace.txt"
-		self.record_test = "/raid/data/dost01/ace2005/record_test_ace.txt"
+
+		self.record_train = "/raid/data/dost01/ace2005/record_train_ace2005.txt"
+		self.record_dev = "/raid/data/dost01/ace2005/record_dev_ace2005.txt"
+		self.record_test = "/raid/data/dost01/ace2005/record_test_ace2005.txt"
 		self.labels_file = "/raid/data/dost01/ace2005/labels_ace2005.txt"
-		self.vocab_file = "/raid/data/dost01/embeddings/glove.6B.300d.txt"
-		"""
+		self.vocab_file = "/raid/data/dost01/embeddings/glove.6B." + str(FLAGS.embeddings_dim) + "d.txt"
+		self.types_file = "/raid/data/dost01/ace2005/types_ace2005.txt"
 
+		"""
 		self.record_train = "/home/dominik/Documents/DFKI/clean_dir/Hiwi-master/NemexRelator2010/features/record_train_ace2005.txt"
+		self.record_dev = "/home/dominik/Documents/DFKI/clean_dir/Hiwi-master/NemexRelator2010/features/record_dev_ace2005.txt"
 		self.record_test = "/home/dominik/Documents/DFKI/clean_dir/Hiwi-master/NemexRelator2010/features/record_test_ace2005.txt"
 		self.labels_file = "/home/dominik/Documents/DFKI/clean_dir/Hiwi-master/NemexRelator2010/features/labels_ace2005.txt"
-		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B.50d.txt"
+		self.vocab_file = "/home/dominik/Documents/Supertagging/glove.6B." + str(FLAGS.embeddings_dim) + "d.txt"
+		self.types_file = "/home/dominik/Documents/DFKI/clean_dir/Hiwi-master/NemexRelator2010/features/types_ace2005.txt"
 		"""
+
+
+		self.oov_file = open("OOVS_ace.txt", "w")
 
 		self.FLAGS = FLAGS
 
-		self.read_embeddings()
+		with open(self.types_file) as types:
+			self.types = {t.strip(): i for i, t in enumerate(types)}
+
+
 
 		self.read_embeddings()
-
 
 		self.train = self.read_records(self.record_train)
+
+		self.dev = self.read_records(self.record_dev)
+		self.train = (self.train[0] + self.dev[0], np.concatenate((self.train[1], self.dev[1])), self.train[2] + self.dev[2], np.concatenate((self.train[3], self.dev[3])), np.concatenate((self.train[4], self.dev[4])), np.concatenate((self.train[5], self.dev[5])))
+
 
 		self.max_length = max([len(x) for x in self.train[0]])
 		xs = np.asarray([np.concatenate((tmp, np.zeros(self.max_length - len(tmp)))) for tmp in self.train[0]])
 		positions = np.asarray([np.concatenate((tmp, np.zeros(self.max_length - len(tmp)))) for tmp in self.train[2]])
 		print (positions[:5])
-		self.train = (xs, self.train[1], positions, self.train[3], self.train[4])
+		"""
+		in ace2005, entities are associated with types (FACILITY, GEOPOLITICAL ENTITY etc.), 
+		there exist 7 different types and they are stored in self.train[5] as a one hot encoding
+		shape: [NUM_EXAMPLES, 14] (one hot for 7 types of e1, one hot for 7 types of e2, simply concatenated)
+		#self.train = (xs, self.train[1], positions, self.train[3], self.train[4], self.train[5])
+		"""
+		self.train = (xs, self.train[1], positions, self.train[3], self.train[4], self.train[5])
+
+
 
 		self.test = self.read_records(self.record_test)	
+		self.sentences_info = self.test[-1]
 		self.max_length_test = max([len(x) for x in self.test[0]])
 		xs = np.asarray([np.concatenate((tmp, np.zeros(self.max_length_test - len(tmp)))) for tmp in self.test[0]])
 		positions = np.asarray([np.concatenate((tmp, np.zeros(self.max_length_test - len(tmp)))) for tmp in self.test[2]])
+		#self.test = (xs, self.test[1], positions, self.test[3], self.test[4], self.test[5])
 		self.test = (xs, self.test[1], positions, self.test[3], self.test[4])
+		print ([np.shape(x) for x in self.train])
+		print ([np.shape(x) for x in self.test])
 
-		"""
-		if corpus == "semeval":
-			self.record_train = "/raid/data/dost01/semeval10_data/TRAIN_FILE.TXT"
-			self.record_test = "/raid/data/dost01/semeval10_data/TEST_FILE_FULL.TXT"
-			self.labels_file = "/raid/data/dost01/semeval10_data/labels.txt"
-			self.vocab_file = "/raid/data/dost01/embeddings/glove.6B.300d.txt"
 
-			self.read_embeddings()
-
-			self.max_length = max([len(x) for x in self.train[0]])
-			xs = np.asarray([np.concatenate((tmp, np.zeros(self.max_length - len(tmp)))) for tmp in self.train[0]])
-			positions = np.asarray([np.concatenate((tmp, np.zeros(self.max_length - len(tmp)))) for tmp in self.train[2]])
-			self.train = (xs, self.train[1], positions, self.train[3], self.train[4])
-		
-			self.max_length_test = max([len(x) for x in self.test[0]])
-			xs = np.asarray([np.concatenate((tmp, np.zeros(self.max_length_test - len(tmp)))) for tmp in self.test[0]])
-			positions = np.asarray([np.concatenate((tmp, np.zeros(self.max_length_test - len(tmp)))) for tmp in self.test[2]])
-			self.test = (xs, self.test[1], positions, self.test[3], self.test[4])
-		elif corpus == "ace":
-			...
-		"""
 	def read_embeddings(self):
 		"""
 		read embeddings and store each word in the rows of the matrix at its index
@@ -74,6 +79,7 @@ class preprocessing:
 		self.word2id = {}
 		# number of words in embedding file + 2, first is __PADDING__, last is __UNKNOWN__ token
 		self.embs = np.zeros((400000 + 2, self.FLAGS.embeddings_dim))
+		#c_1, c_2 = 0,0
 		with open(self.vocab_file) as f:
 			for line in f:
 				split = line.strip().split()
@@ -82,74 +88,183 @@ class preprocessing:
 					continue
 				else:
 					word, vec = split[0], [float(val) for val in split[1:]]
+					"""
+					if "-" in word:
+						#print (word)
+						c_1 += 1
+					if "_" in word:
+						print (word)
+						c_2 += 1
+					"""
 					self.word2id[word] = vocab_counter
 					self.embs[vocab_counter,:] = vec
 					vocab_counter += 1
+		#print (c_1, c_2) // 33402 460
 		self.word2id["__PADDING__"] = 0
 		self.word2id["__UNKNOWN__"] = vocab_counter
 		self.id2word = {j:i for (i,j) in self.word2id.items()}
 		self.embs[vocab_counter,:] = np.random.random(self.FLAGS.embeddings_dim)
 		return self
 
+	def lookup(self, w):
+		w = w.lower()
+		#w = w.replace("-", "_").lower()
+		#w = "".join(["#" if char.isdigit() else char for char in w])
+		if w in self.word2id:
+			return [self.word2id[w]]
+		elif "".join([c for c in w if c.isalnum()]) in self.word2id:
+			return [self.word2id["".join([c for c in w if c.isalnum()])]]
 
-	def read_records(self,fn):
-		"""
-		reads the train and test file and vectorizes sequences with word indexes
-		returns X and y
-		"""
+		elif not w.isalnum():
+			if w.startswith("http://") or w.startswith("https://"):
+				return [self.word2id["url"]]
+			elif w.startswith("www."):
+				return [self.word2id["url"]]
+			split = "".join([c if c.isalnum() else " " for c in w]).split()
+			if len(split) > 3:
+				print (w)
+
+			split = "".join([c if c.isalnum() else " " for c in w]).split()
+			if not split:
+				return [self.word2id["__UNKNOWN__"]]
+
+			if split[-1] not in self.word2id:
+				self.oov_file.write(w + "\n")
+				return [self.word2id["__UNKNOWN__"]]
+			tmp = []
+			for subword in split:
+				if len(subword) == 0:
+					continue
+				if subword in self.word2id:
+					tmp.append(self.word2id[subword])
+				else:
+					self.oov_file.write(w + "\t" + subword + "\n")
+					tmp.append(self.word2id["__UNKNOWN__"])
+			return tmp
+		else:
+			self.oov_file.write(w + "\n")
+			return [self.word2id["__UNKNOWN__"]]
+
+
+	def tokenize(self, line):
+		line = ast.literal_eval(line)
+		sent = line[1]
+		e1_start, e1_end = line[2], line[3]
+		e2_start, e2_end = line[4], line[5]
+		label = line[6]
+		context_left = sent[:e1_start]
+		e1 = sent[e1_start:e1_end]
+		context_mid = sent[e1_end:e2_start]
+		e2 = sent[e2_start:e2_end]
+		context_right = sent[e2_end:]
+		types = line[-1]
+		t0, t1 = types[0], types[1]
+		t0 = self.create_one_hot(len(self.types), self.types[t0])
+		t1 = self.create_one_hot(len(self.types), self.types[t1])
+		types = np.concatenate((t0, t1))
+		types = types.astype(float)
+		return context_left, e1, context_mid, e2, context_right, label, types
+
+	def read_records(self, fn):
 		with open(self.labels_file) as labs:
 			labels = {lab.strip(): i for i, lab in enumerate(labs)}
-		NUM_OOV_TOKENS = 0 
-		NUM_TOKENS = 0
+		#invs = [1,0,3,2,5,4,7,6,9,8,11,10,13,12,15,14,16,18,17]
 		X, y = [], []
 		X_queries, X_positions, X_position_of_queries = [], [], []
+		X_types = []
+		sentences = []
+		if "train" in fn:
+			outfile = open("tokenized_and_lookup_ace.txt", "w")
 
-		"""
-		max_len = 0
-		if is_train:
-			with open(fn) as infile:
-				for line in infile:
-					line = ast.literal_eval(line)
-					sent = line[1]
-					max_len = max(len(sent), max_len)
-			sent_length = max_len
-		"""
 		with open(fn) as infile:
 			for line in infile:
-				line = ast.literal_eval(line)
-				sent = line[1]
-				e1, e2 = line[2]-1, line[3] - 1
-				label = line[4]
+				context_left, e1, context_mid, e2, context_right, label, types = self.tokenize(line)
+				X_types.append(types)
+				tmp = context_left + e1 + context_mid + e2 + context_right
+				tmp = tmp[:-1]
 				word_ids = []
-				queries = []
-				query_positions = [e1 + 1, e2 + 1]
-				for i, w in enumerate(sent):
-					if w == "'s":
-						continue
-					if not w.isalnum():
-						continue
-					w = w.replace("-", "_").lower()
-					w = "".join(["#" if char.isdigit() else char for char in w])
+				sent_info = []
+				for w in context_left:
+					word_ids += self.lookup(w)
+				sent_info.append(len(word_ids))
+				for w in e1:
+					word_ids += self.lookup(w)
+				sent_info.append(len(word_ids))
+				qp_1 = len(word_ids)
+				for w in context_mid:
+					word_ids += self.lookup(w)
+				sent_info.append(len(word_ids))
+				for w in e2:
+					word_ids += self.lookup(w)
+				sent_info.append(len(word_ids))
+				qp_2 = len(word_ids)
+				for w in context_right[:-1]:
+					word_ids += self.lookup(w)
+				sent_info.append(len(word_ids))
+				ids_e1 = []
+				for w in e1:
+					ids_e1 += self.lookup(w)
+				if ids_e1[-1] != self.word2id["__UNKNOWN__"]:
+					q1 = np.sum([self.embs[w] for w in ids_e1 if w != self.word2id["__UNKNOWN__"]], axis=0)
+				else:
+					q1 = np.sum([self.embs[w] for w in word_ids[max(0, qp_1 - len(ids_e1) - 3): qp_1+4] if w != self.word2id["__UNKNOWN__"]], axis=0)
 
-					if w in self.word2id:
-						w = self.word2id[w]
-					else:
-						w = self.word2id["__UNKNOWN__"]
+				ids_e2 = []
+				for w in e2:
+					ids_e2 += self.lookup(w)
+				if ids_e2[-1] != self.word2id["__UNKNOWN__"]:
+					q2 = np.sum([self.embs[w] for w in ids_e2 if w != self.word2id["__UNKNOWN__"]], axis=0)
+				else:
+					q2 = np.sum([self.embs[w] for w in word_ids[max(0, qp_2 - len(ids_e2) - 3): qp_2+4] if w != self.word2id["__UNKNOWN__"]], axis=0)
 
-					if i == e1:
-						queries.append(w)
-					if i == e2:
-						queries.append(w)
-					word_ids.append(w)
-				if len(queries) != 2:
-					continue
-				positions = list(range(1,len(word_ids) + 1))
-				X.append(word_ids)
+				sentences.append((word_ids, sent_info))
+
+				queries = [np.squeeze(q1), np.squeeze(q2)]
+				"""
+				if np.shape(queries) != (2,50):
+					print (np.shape(queries), np.shape(q1), np.shape(np.squeeze(q2)), e1, e2)
+					sys.exit(0)
+				"""
+				query_positions = [qp_1, qp_2]
+				#query_positions = [1, len(tmp) + 2]
+				#print (tmp, positions, [e1, e2], query_positions)
+				tmp = word_ids
+
+
+				if self.FLAGS.use_whole_sentence == "no":
+					# TO GET ONLY [E1, ..., E2]
+					#tmp = word_ids[qp_1 - 1:qp_2]
+					tmp = word_ids[qp_1:qp_2-len(ids_e2)]
+					query_positions = [1, len(tmp)]
+					# TO GET ALL, COMMENT AROUND THIS BLOCK
+
+				#positions = list(range(1,len(tmp) + 1))
+				positions = list(range(2,len(tmp)))				
+				#print (tmp, positions, queries, query_positions)
+				#
+				X.append(tmp)
+				if "train" in fn:
+					outfile.write(line + " ".join([self.id2word[w] for w in tmp]) + "\n")
 				X_positions.append(positions)
 				X_queries.append(queries)
-				X_position_of_queries.append(query_positions)				
+				X_position_of_queries.append(query_positions)
+
 				y.append(self.create_one_hot(len(labels), labels[label]))
-		return X, np.asarray(y), X_positions, np.asarray(X_queries), np.asarray(X_position_of_queries)
+				"""
+				if "train" in fn.lower():
+				#if "train" in fn.lower() and counter < 4 * 7500:
+					if label != "Other":
+						y.append(self.create_one_hot(len(labels), labels_inv[label]))
+						#queries = list(reversed(queries))
+						queries = [q2, q1]
+						query_positions = list(reversed(query_positions))
+						X.append(tmp)
+						X_positions.append(positions)
+						X_queries.append(queries)
+						X_position_of_queries.append(query_positions)
+				"""
+		print (np.shape(y), np.shape(X_queries), np.shape(X_position_of_queries))
+		return X, np.asarray(y), X_positions, np.asarray(X_queries), np.asarray(X_position_of_queries), np.asarray(X_types), sentences
 
 	def create_one_hot(self, length, x):
 		# create one hot vector
@@ -173,15 +288,16 @@ if __name__ == "__main__":
 	flags.DEFINE_integer("embeddings_dim", 50, "number of dimensions in word embeddings")
 	flags.DEFINE_float("l2_lambda", 0.0001, "")
 	flags.DEFINE_integer("max_gradient_norm", 5, "")
+	flags.DEFINE_string("use_whole_sentence", "no", "")
 	flags.DEFINE_integer("classifier_units", 100, "")
 
 	FLAGS = flags.FLAGS
-	preprocessing = preprocessing(FLAGS)
+	preprocessing = preprocessing_ace(FLAGS)
 	for i in range(5):
+		print ([w for (i,w) in np.ndenumerate(preprocessing.train[0][i]) if preprocessing.id2word[w] != "__PADDING__"])
 		print ([preprocessing.id2word[w] for (i,w) in np.ndenumerate(preprocessing.train[0][i]) if preprocessing.id2word[w] != "__PADDING__"])
 		print ([w for (i,w) in np.ndenumerate(preprocessing.train[2][i]) if w != 0])
-		print ([preprocessing.id2word[w] for (i,w) in np.ndenumerate(preprocessing.train[3][i])])
+		#print ([preprocessing.id2word[w] for (i,w) in np.ndenumerate(preprocessing.train[3][i])])
 		print ([w for (i,w) in np.ndenumerate(preprocessing.train[4][i])])
-	print (np.shape(preprocessing.train[0]), np.shape(preprocessing.train[1]), np.shape(preprocessing.train[2]), np.shape(preprocessing.train[3]), np.shape(preprocessing.train[4]))
 	#print ([p for (i,p) in np.ndenumerate(preprocessing.train[1][:5]) if p != 0])
 	#print (preprocessing.train[0][:5])
