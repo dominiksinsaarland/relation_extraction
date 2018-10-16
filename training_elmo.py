@@ -3,18 +3,32 @@ from find_best_gpu import *
 import random
 
 def get_batch(tup, old, new):
-	# get actual batch and pad down padding tokens to max length of batch
+	"""
+	build batches dynamically
+	remember: train and test are tuples consisting of (embedded_sentences, labels, position_entities, tokens)
+	we need to return: embeddings, queries, positions, position_queries, labels
+	"""
+	tup = [x[old:new] for x in tup]
+	labels = tup[1]
+	xs, queries, positions, position_queries = [], [], [], []
+	max_len = max([e[1] - e[0] - 1 for e in tup[2]])
 
-	"""
-	batch = [x[old:new] for x in tup]
-	xs = [[w for w in x if w != 0] for x in batch[0]]
-	positions = [[w for w in x if w != 0] for x in batch[2]]
-	max_length = max([len(x) for x in xs])
-	xs = tf.keras.preprocessing.sequence.pad_sequences(xs,padding="post")
-	positions = tf.keras.preprocessing.sequence.pad_sequences(positions,padding="post")
-	"""
-	return [x[old:new] for x in tup]
-	#return [xs, batch[1], positions, batch[3], batch[4]]
+	for embedded, entities in zip(tup[0], tup[2]):
+		e1, e2 = entities[0], entities[1]
+		x = embedded[e1+1:e2]
+		pos = list(range(2,len(x) + 2))
+
+		position_queries.append([1, len(pos) + 2])
+		pos +=[0] * (max_len - len(x))
+
+		if len(x) < max_len:
+			x = np.concatenate((x, np.zeros((max_len-len(x),1024))),axis=0)
+		xs.append(x)
+
+
+		positions.append(pos)
+		queries.append([embedded[e1], embedded[e2]])
+	return np.array(xs), np.array(labels), np.array(positions), np.array(queries), np.array(position_queries)
 
 def write_html_file(sent,info, q1, q2,predicted, true, entity):
 	# write out html file and highlight, what the different queries look at
@@ -77,35 +91,6 @@ def write_html_file(sent,info, q1, q2,predicted, true, entity):
 		html_string += "<br><br></p>\n"
 		return html_string
 
-def micro_f1(y_true, y_pred):
-	# micro f1, important for ace and kbp37?
-	if FLAGS.corpus == "ace":
-		OTHER_RELATION = "NO_RELATION(Arg-1,Arg-1)"
-	elif FLAGS.corpus == "kbp37":
-		OTHER_RELATION = "no_relation"
-	d = defaultdict(int)
-	for i,j in zip(y_true, y_pred):
-		if i == j:
-			d[i +"_TP"] += 1
-		else:
-			d[j + "_FP"] += 1
-			d[i + "_FN"] += 1
-	TP = 0
-	FP = 0
-	FN = 0
-	for i,j in d.items():
-		if i.endswith("_TP") and i != OTHER_RELATION + "_TP":
-			TP += j
-		if i.endswith("_FP") and i != OTHER_RELATION + "_FP":
-			FP += j
-
-		if i.endswith("_FN") and i != OTHER_RELATION + "_FN":
-			FN += j
-	Pr = TP/(TP + FP)
-	Rc = TP/(TP + FN)
-	F1 = (2 * Pr * Rc) / (Pr + Rc) 
-	return "{0:.2f}".format(Pr * 100), "{0:.2f}".format(Rc * 100), "{0:.2f}".format(F1 * 100)
-
 def macro_f1(y_true, y_pred):
 	"""
 	evaluate macro f1 (prodcues the same results as the official scoring file "semeval2010_task8_scorer-v1.2.pl"
@@ -143,144 +128,77 @@ def macro_f1(y_true, y_pred):
 		F1 = f / len(items)
 		return "{0:.2f}".format(Pr * 100), "{0:.2f}".format(Rc * 100), "{0:.2f}".format(F1 * 100)
 
-	elif FLAGS.corpus == "kbp37":
-		"""
-		evaluate macro f1 (prodcues the same results as the official scoring file "semeval2010_task8_scorer-v1.2.pl"
-		ignores the Other class
-		returns pr, rc and f1 rounded to two decimal points as strings
-		"""
-
-		OTHER = "no_relation"
-		d = defaultdict(int)
-		for i,j in zip(y_true, y_pred):
-			if i == j:
-				d[i.split("(")[0] +"__TP"] += 1
-			else:
-				d[j.split("(")[0] + "__FP"] += 1
-				d[i.split("(")[0] + "__FN"] += 1
-		TP = 0
-		FP = 0
-		FN = 0
-		items = set()
-		for key in d:
-			items.add(key.split("__")[0])
-		items.remove(OTHER)
-		pr, rc, f = 0,0,0
-		for item in items:
-			t_pr = d[item + "__TP"] / (d[item + "__TP"] + d[item + "__FP"])
-			t_rc = d[item + "__TP"] / (d[item + "__TP"] + d[item + "__FN"])
-			pr += t_pr
-			rc += t_rc
-			if t_pr + t_rc == 0:
-				print (len(items))
-				continue
-			f += 2 * t_pr * t_rc / (t_pr + t_rc)
-		Pr = pr /len(items)
-		Rc = rc / len(items)
-		F1 = f / len(items)
-		return "{0:.2f}".format(Pr * 100), "{0:.2f}".format(Rc * 100), "{0:.2f}".format(F1 * 100)
-
 
 if __name__ == "__main__":
 
-
+	# find best gpu and set system variables
 	BEST_GPU = find_best_gpu()
-
 	import os
 	os.environ["CUDA_VISIBLE_DEVICES"] = str(BEST_GPU)
-	#os.environ["CUDA_VISIBLE_DEVICES"] = ""
-	#os.environ["inter_op_parallelism_threads"] = str(1)
-
 
 	# Import must happen afterwards
-
 	# After changing visible devices there will be only 1 available device which gets id 0 by default.
 	# Hence, make sure to always select gpu:0
 	device = '/gpu:0'
 	"""
+	# if one wants to work on cpu, comment out everything above and set device ="/cpu:0"
 	device = "/cpu:0"
-
 	"""
-
-	# set some seeds, still non-deterministic
+	# set some seeds
 	seed = 1337
-
 	random.seed(seed)
 	import numpy as np
 	np.random.seed(seed)
-	#from preprocessing_new import *
+	import tensorflow as tf
 	from load_word_embeddings import *
-	#from universal_transformers import *
 	from transformer_elmo import *
-	#from preprocessing_ace import *
-	#from preprocessing_kbp37 import *
 	tf.set_random_seed(seed)
 
-
-
 	with tf.device(device):
+		# define some hyperparameters
 		flags = tf.flags
-
-		# some of the flags are not needed anymore
-		#flags.DEFINE_float("learning_rate", 0.001, "") // use adaptive learning rate instead, see explanations below
 		flags.DEFINE_integer("num_labels", 19, "number of target labels")
+		flags.DEFINE_float("label_smoothing", 0.1, "label smoothing")
 		flags.DEFINE_integer("batch_size", 2000, "number of batchsize, bigger works better")
 		flags.DEFINE_float("dropout", 0.40, "dropout applied after each layer")
-		#flags.DEFINE_integer("sent_length", 50, "sentence length")
-		flags.DEFINE_integer("num_layers", 2, "num layers for encoding/decoding")
-		flags.DEFINE_integer("num_heads",4, "num heads per layer")
-		#flags.DEFINE_integer("num_epochs",20, "")
-		#flags.DEFINE_integer("min_length", 0, "min length of encoded sentence")
-		flags.DEFINE_integer("embeddings_dim", 100, "number of dimensions in word embeddings")
-		flags.DEFINE_float("l2_lambda", 0, "")
-		#flags.DEFINE_integer("max_gradient_norm", 5, "")
-		#flags.DEFINE_integer("classifier_units", 100, "")
+		flags.DEFINE_integer("num_layers", 1, "num layers for encoding/decoding")
+		flags.DEFINE_integer("num_heads",8, "num heads per layer")
+		flags.DEFINE_integer("embeddings_dim", 1024, "number of dimensions in word embeddings")
+		flags.DEFINE_float("l2_lambda", 0.05, "")
 		flags.DEFINE_integer("warmup_steps", 500, "")
-		flags.DEFINE_integer("max_steps", 2000, "")
-		flags.DEFINE_string("summaries_dir", "test", "")
-		flags.DEFINE_string("use_whole_sentence", "no", "")
+		flags.DEFINE_integer("max_steps", 1001, "")
 		flags.DEFINE_string("corpus", "semeval", "")
 		flags.DEFINE_string("iteration", "", "")
-		flags.DEFINE_string("class_weights", "no", "")
-		flags.DEFINE_integer("window_size", 2, "")
 		flags.DEFINE_string("resultfile", "default", "")
-		flags.DEFINE_string("use_inverse", "no", "")
+		flags.DEFINE_float("hidden_units_ffclayer", 2, "")
 
+		flags.DEFINE_string("labels_file","/raid/data/dost01/semeval10_data/labels.txt", "files with one label per line")
+		flags.DEFINE_string("train_file", "semeval10_meta_info_train.txt", "filename of meta info train (positions queries, labels")
+		flags.DEFINE_string("test_file", "semeval10_meta_info_test.txt", "filename of meta info test (positions queries, labels")
+		flags.DEFINE_string("word_embeddings_train","semeval_elmo_embeddings_train_sentences", "filename of word embeddings train (npy file")
+		flags.DEFINE_string("word_embeddings_test", "semeval_elmo_embeddings_test_sentences", "filename of word embeddings test (npy file")
 
 		FLAGS = flags.FLAGS
-		FLAGS.max_steps = FLAGS.warmup_steps * 4 + 1
 		# initialize preprocessing
-		if FLAGS.corpus == "semeval":
-			preprocessing = preprocessing(FLAGS)
-		elif FLAGS.corpus == "kbp37":
-			FLAGS.num_labels = 37
-			preprocessing = preprocessing_kbp37(FLAGS)
-			batch_size = 2000
-		elif FLAGS.corpus == "ace":
-			FLAGS.num_labels = 11
-			preprocessing = preprocessing_ace(FLAGS)
-			batch_size = 2000
-
+		preprocessing = preprocessing(FLAGS)
+		
+		# for evaluation
 		with open(preprocessing.labels_file) as labs:
 			labels2id = {lab.strip(): i for i, lab in enumerate(labs)}
 			id2labels = {j:i for i,j in labels2id.items()}
-		#f1_results = open("test/f1_results_layers_" + str(FLAGS.num_layers) + "_heads_" + str(FLAGS.num_heads) + "_dropout_" + str(FLAGS.dropout) + ".txt", "w")
+
 		if FLAGS.resultfile == "default":
 			f1_results = open("f1_results" + FLAGS.iteration + ".txt", "w")	
 		else:
 			f1_results = open(FLAGS.resultfile + FLAGS.iteration + ".txt", "w")
+
 		# initialize model
 		transformers_model = model(preprocessing, FLAGS)
 		init = tf.global_variables_initializer()
-		saver = tf.train.Saver()
 		current_step = 0
-
 		# soft placement needed to run on gpu
 		config = tf.ConfigProto(allow_soft_placement = True)
-		#config.intra_op_parallelism_threads = 1
-
 		with tf.Session(config=config) as sess:
-
 			sess.run(init)
 			while current_step < FLAGS.max_steps:
 				# shuffle
@@ -291,47 +209,29 @@ if __name__ == "__main__":
 					current_lr = (FLAGS.embeddings_dim ** -0.5) * min(current_step ** -0.5, current_step * FLAGS.warmup_steps ** -1.5)
 					old = FLAGS.batch_size * batch
 					new = FLAGS.batch_size * (batch + 1)
-					# load batch data
+					# compute batches dynamically
 					this_batch = get_batch(train, old, new)
 					# train step
-					#batch_weights = [1 if np.argmax(i) != 16 else 1.25 for i in this_batch[1]]
-					#batch_weights = np.ones(len(this_batch[1]))
-					summary, _ = sess.run([transformers_model.merged,transformers_model.train_step], feed_dict={transformers_model.x: this_batch[0], transformers_model.y: this_batch[1], transformers_model.positions:this_batch[2], transformers_model.queries:this_batch[3],transformers_model.query_positions:this_batch[4], transformers_model.learning_rate:current_lr})
+					sess.run(transformers_model.train_step, feed_dict={transformers_model.x: this_batch[0], transformers_model.y: this_batch[1], transformers_model.positions:this_batch[2], transformers_model.queries:this_batch[3],transformers_model.query_positions:this_batch[4], transformers_model.learning_rate:current_lr})
 
 					# eval every 50 steps
-					if current_step % 50 == 0:
-						
-						summary, _ = sess.run([transformers_model.merged,transformers_model.predictions], feed_dict={transformers_model.x: this_batch[0], transformers_model.y: this_batch[1], transformers_model.positions:this_batch[2], transformers_model.queries:this_batch[3],transformers_model.query_positions:this_batch[4], transformers_model.learning_rate:current_lr}) 
-						transformers_model.train_writer.add_summary(summary, current_step / 50)
-						
-						# for ace, need to eval in minibatches (37'000 examples in testset)
-						if FLAGS.corpus == "semeval":
-							labs = []
-							for test_batch in range(len(preprocessing.test[0]) // FLAGS.batch_size + 1):
-								old = FLAGS.batch_size * test_batch
-								new = FLAGS.batch_size * (test_batch + 1)
-								test_batch = get_batch(preprocessing.test, old, new)
-								summary, this_labs = sess.run([transformers_model.merged, transformers_model.predictions], feed_dict={transformers_model.x: test_batch[0], transformers_model.y: test_batch[1], transformers_model.positions:test_batch[2], transformers_model.queries:test_batch[3], transformers_model.query_positions:test_batch[4]}) 
-								labs += list(this_labs)
-						else:
-							summary, labs = sess.run([transformers_model.merged, transformers_model.predictions], feed_dict={transformers_model.x: preprocessing.test[0], transformers_model.y: preprocessing.test[1], transformers_model.positions:preprocessing.test[2], transformers_model.queries:preprocessing.test[3], transformers_model.query_positions:preprocessing.test[4]})
-
-						transformers_model.test_writer.add_summary(summary, current_step / 50)
-
+					if current_step % 50 == 0:						
+						labs = []
+						# predictions batchwise too because of memory issues
+						for test_batch in range(len(preprocessing.test[0]) // FLAGS.batch_size + 1):
+							old = FLAGS.batch_size * test_batch
+							new = FLAGS.batch_size * (test_batch + 1)
+							test_batch = get_batch(preprocessing.test, old, new)
+							this_labs = sess.run(transformers_model.predictions, feed_dict={transformers_model.x: test_batch[0], transformers_model.y: test_batch[1], transformers_model.positions:test_batch[2], transformers_model.queries:test_batch[3], transformers_model.query_positions:test_batch[4]}) 
+							labs += list(this_labs)
 						
 						acc = sum([1 for i,j in zip(labs, preprocessing.test[1]) if i == np.argmax(j)])/len(preprocessing.test[1])
 						print ("step:", current_step, "acc", acc)			
 						labs = [id2labels[i] for i in labs]
 						true = [id2labels[np.argmax(i)] for i in preprocessing.test[1]]
-						# to not break the program in the first few epochs because of zero division errors
+						# try-except block to not break the program in the first few epochs because of zero division errors
 						try:
-							if FLAGS.corpus == "ace":
-								print (micro_f1(true, labs))
-							elif FLAGS.corpus == "kbp37":
-								print (micro_f1(true, labs))
-								print (macro_f1(true, labs))
-							else:
-								print (macro_f1(true, labs))
+							print (macro_f1(true, labs))
 							f1_results.write("step: " + str(current_step) + " acc: " + str(acc) + " f1: " + str(macro_f1(true, labs)) + "\n")
 						except Exception as inst:
 							print (str(inst))
