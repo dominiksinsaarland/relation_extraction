@@ -6,4 +6,4 @@ python preprocessing_elmo.py
 
 then run the model, for our final version: run with
 
-python training_elmo.py --iteration $i --encoder_attention no --decoder_self_attention no --encoder_feedforward no --resultfile final_results_semveval_
+python training_elmo.py --encoder_attention no --decoder_self_attention no --encoder_feedforward no --resultfile final_results_semveval_
