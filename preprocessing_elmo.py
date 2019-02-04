@@ -5,9 +5,11 @@ import time
 from collections import defaultdict
 import re
 
+"""
 from allennlp.modules.elmo import Elmo, batch_to_ids
 import allennlp
 from allennlp.commands.elmo import ElmoEmbedder
+"""
 import tensorflow_hub as hub
 class preprocessing:
 	"""
