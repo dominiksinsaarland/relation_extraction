@@ -16,4 +16,26 @@ python preprocessing_elmo.py --labels_file path_to_labels_file --train_infile pa
 # run the model
 then run the model, for our final version: run with
 
-python training_elmo.py --encoder_attention no --decoder_self_attention no --encoder_feedforward no --resultfile final_results_semveval_ --labels_file path_to_labels_file --train_file path_to_train --test_file path_to_test --word_embeddings_train path_to_word_embedding_train --word_embeddings_test path_to_word_embeddings_test
+CUDA_VISIBLE_DEVICES=0 python training_elmo.py --labels_file=../relation_classification_data/labels.txt --train_file=$train_file --test_file=$test_file --word_embeddings_train=$elmo_train --word_embeddings_test=$elmo_test --num_epochs=25 --dropout=0.15 --batch_size=1000 --l2_lambda=0 --num_heads=2 --calculate_sdp_information=yes
+
+# run full pipeline
+
+simply run 
+
+bash run_full_rc_pipeline.sh
+
+# dependencies
+
+pip install spacy
+
+python -m spacy download en
+
+pip install numpy 
+
+pip install nltk
+
+python -c 'import nltk; nltk.download("stopwords");'
+
+pip install tensorflow-gpu
+
+pip install tensorflow-hub
