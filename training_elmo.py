@@ -386,37 +386,39 @@ if __name__ == "__main__":
 					tmp = sess.run(transformers_model.get_attention_scores[i], feed_dict={transformers_model.x: test_batch[0], transformers_model.y: test_batch[1], transformers_model.positions:test_batch[2], transformers_model.queries:test_batch[3], transformers_model.query_positions:test_batch[4]})
 					attention_scores[:,i][old:new] = tmp
 
-			att_mass_in, att_mass_out = 0,0
-			spd_exists = 0
-			tokens_in, tokens_out = 0,0
-			with open(FLAGS.sdp_file_test) as infile:
-				for scores, line in zip(attention_scores, infile):
-					line = line.strip().split("\t")
-					if not line[1]:
-						continue
-					spd = list(map(int, line[1].split()))
-					e1, e2 = spd[0], spd[-1]
-					spd = spd[1:-1]
-					if not spd:
-						continue
-					spd = [i - e1 - 1 for i in spd]
-					spd_exists += 1
-					for head in scores:
-						for ent in head:
-							for i,j in enumerate(ent):
-								if i in spd:
-									att_mass_in += j
-								else:
-									att_mass_out += j
-								if i > e2 - e1:
-									break
-					tokens_in += len(spd)
-					tokens_out += e2 - e1
-			print (att_mass_in, att_mass_out, att_mass_in/(att_mass_in+att_mass_out))
+
+			if FLAGS.calculate_sdp_information == "yes":
+				att_mass_in, att_mass_out = 0,0
+				spd_exists = 0
+				tokens_in, tokens_out = 0,0
+				with open(FLAGS.sdp_file_test) as infile:
+					for scores, line in zip(attention_scores, infile):
+						line = line.strip().split("\t")
+						if not line[1]:
+							continue
+						spd = list(map(int, line[1].split()))
+						e1, e2 = spd[0], spd[-1]
+						spd = spd[1:-1]
+						if not spd:
+							continue
+						spd = [i - e1 - 1 for i in spd]
+						spd_exists += 1
+						for head in scores:
+							for ent in head:
+								for i,j in enumerate(ent):
+									if i in spd:
+										att_mass_in += j
+									else:
+										att_mass_out += j
+									if i > e2 - e1:
+										break
+						tokens_in += len(spd)
+						tokens_out += e2 - e1
+				print (att_mass_in, att_mass_out, att_mass_in/(att_mass_in+att_mass_out))
 
 
-			#attention_scores = np.mean(attention_scores,axis=0)
-			print ("attention scores", np.shape(attention_scores))
+				#attention_scores = np.mean(attention_scores,axis=0)
+				print ("attention scores", np.shape(attention_scores))
 
 			#remember: train and test are tuples consisting of (embedded_sentences, labels, position_entities, tokens)
 			print (len(preprocessing.test[-1]), len(labs_true), len(labs_pred), len(attention_scores), len(preprocessing.test[2]))
